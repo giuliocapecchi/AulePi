@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+
+output.json
+webscrape.py
+*.ics
