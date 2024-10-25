@@ -145,6 +145,12 @@ export default function Map({
                     </div>
                 </div>
                 <div className="flex items-center gap-0">
+                    <div className="h-2 w-2 rounded-full bg-orange-400 flex-none"></div>
+                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-red-300/90">
+                        closed
+                    </div>
+                </div>
+                <div className="flex items-center gap-0">
                     <div className="h-2 w-2 rounded-full bg-red-400 flex-none"></div>
                     <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
                         unavailable

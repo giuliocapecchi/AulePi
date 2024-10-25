@@ -66,8 +66,7 @@ export default function Home() {
                             // Imposta i dati direttamente come oggetto di tipo BuildingData
                             setData(fetchedData);
     
-                            // TODO : rimuovi 
-                            console.log("Data fetched:", fetchedData);
+                            //console.log("Data fetched:", fetchedData);
                         } catch (error) {
                             console.error("Failed to fetch data from backend:", error);
                         } finally {
