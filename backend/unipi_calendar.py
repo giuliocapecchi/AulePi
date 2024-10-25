@@ -181,6 +181,10 @@ def get_buildings_status(lessons):
 
         # Confronta l'orario per selezionare lezioni future o in corso oggi
         if start_time.date() == now.date() and end_time > now:
+            # rimuovi tutte le '\' da 'lesson['professor']
+            lesson['professor'] = lesson['professor'].replace("\\", "")
+            # rimuovi '\nNOTE:'
+            lesson['professor'] = lesson['professor'].split("\nNOTE:")[0]
             buildings_status[polo][location]['lessons'].append({
                 'professor': lesson['professor'],
                 'start': start_time.strftime('%Y-%m-%d %H:%M:%S'),
