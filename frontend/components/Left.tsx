@@ -9,6 +9,17 @@ import {
 
 import { Lesson, BuildingData } from "@/types/interfaces";
 
+const errorData: BuildingData = {
+    building: "Error",
+    building_code: "ERROR_CODE",
+    building_status: "Internal Server Error",
+    rooms: {}, // Valori fittizi
+    coordinates: [0, 0], 
+    distance: Infinity,
+    free: false,
+    isClosed: true 
+};
+
 export default function Left({
     data,
     activeBuilding,
@@ -18,7 +29,12 @@ export default function Left({
     activeBuilding: string | null;
     setActiveBuilding: (building: string) => void;
 }) {
+    if (Object.keys(data).length === 0) { // Se data è un oggetto vuoto
+        console.log("Empty server answer; is the server reachable?");
+        data = { InternalServerError: errorData };
+    }
     return (
+
         <div className="px-8">
             <Accordion
                 type="single"
