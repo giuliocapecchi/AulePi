@@ -175,6 +175,25 @@ def get_buildings_status(lessons):
             'poloC' : [10.38901079266688, 43.72140114553582],
             'poloF' : [10.388287350482187, 43.72085438583843],
             'poloPN': [10.391229871075552, 43.72584890979181]}
+    
+
+    # Apri il file aule.csv in modalità lettura
+    with open("./calendari/aule.csv", 'r') as f:
+        reader = csv.reader(f)
+        next(reader)  # Salta l'intestazione
+        for row in reader:
+            polo = row[0]
+            location = row[1]
+            free = row[2] == 'True'
+            if polo not in buildings_status:
+                buildings_status[polo] = {}
+                buildings_status[polo]['coordinates'] = poli_coordinates[polo]
+            if location not in buildings_status[polo]:
+                buildings_status[polo][location] = {
+                    'lessons': [],
+                    'free': free
+                }
+
 
     # Itera su tutte le lezioni
     for lesson in lessons:
