@@ -30,6 +30,11 @@ def get_slot_status(current_time, start_time_str, end_time_str):
     else:
         return "unavailable"
     
+
+@app.get('/')
+def hello_world():
+    return "Backend flask server for the AulePi project"
+    
     
 
 @app.route('/api/test', methods=['GET'])
