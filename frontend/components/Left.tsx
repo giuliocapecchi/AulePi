@@ -6,21 +6,8 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 
-interface Lesson {
-    end: string;
-    professor: string;
-    start: string;
-    summary: string;
-}
 
-interface Room {
-    free: boolean;
-    lessons?: Lesson[];
-}
-
-interface BuildingData {
-    [key: string]: Room | boolean | [number, number];
-}
+import { Lesson, BuildingData } from "@/types/interfaces";
 
 export default function Left({
     data,
@@ -41,8 +28,6 @@ export default function Left({
                 onValueChange={(val) => setActiveBuilding(val)}
             >
                 {Object.entries(data).map(([buildingCode, building]) => {
-                    const { label: divElem, isClosed } = getBuildingAvailability(buildingCode, building.free as boolean);
-                    
                     return (
                         <AccordionItem
                             id={buildingCode}
@@ -50,8 +35,8 @@ export default function Left({
                             key={buildingCode}
                         >
                             <AccordionTrigger
-                            disabled={isClosed}
-                            isClosed={isClosed} // Passa la prop isClosed all'AccordionTrigger
+                            disabled={building.isClosed}
+                            isClosed={building.isClosed} // Passa la prop isClosed all'AccordionTrigger
                             >
                                 <div className="flex justify-between w-[95%] text-left text-lg group items-center">
                                     <div className="group-hover:underline underline-offset-8 pr-2">
@@ -59,8 +44,8 @@ export default function Left({
                                     </div>
                                     <div className="flex items-center justify-end">
                                         
-                                            {divElem}
-                                        
+                                    {getAvailabilityDiv(building)}
+
                                     </div>
                                 </div>
                             </AccordionTrigger>
@@ -87,7 +72,7 @@ export default function Left({
                                                 </div>
                                             </div>
                                             <ul className="text-right">
-                                                {room.lessons?.map((lesson, index) => (
+                                            {room.lessons?.map((lesson: Lesson, index: number) => (
                                                     <li key={index}>
                                                         {formatTime(lesson.start)} - {formatTime(lesson.end)} | {lesson.professor} 
                                                     </li>
@@ -126,78 +111,27 @@ function formatTime(timeString: string) {
 }
 
 
-
 // Funzione per ottenere la label colorata per un building, a seconda dello stato e dell'ora
-function getBuildingAvailability(buildingCode: string, buildingStatus: boolean) {
-    
-    let isClosed = isBuildingClosed(buildingCode);
-
-    if (isClosed === true) {
-        return {
-            label: (
-                <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-red-300/90">
-                    closed
-                </div>
-            ),isClosed,
-        };
+function getAvailabilityDiv(building: BuildingData): JSX.Element {
+    if (building.isClosed) {
+        return (
+            <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-red-300/90">
+                closed
+            </div>
+        );
     }
 
-    if (buildingStatus) {
-        return {
-            label: (
-                <div className="bg-green-800/20 text-green-300/90 rounded-lg px-2 py-1 text-sm">
-                    rooms available
-                </div>
-            ), isClosed: false,
-        };
+    if (building.free) {
+        return (
+            <div className="bg-green-800/20 text-green-300/90 rounded-lg px-2 py-1 text-sm">
+                rooms available
+            </div>
+        );
     } else {
-        return {
-            label: (
-                <div className="bg-red-700/20 text-red-300/80 rounded-lg px-2 py-1 text-sm">
-                    unavailable
-                </div>
-            ),isClosed: false,
-        };
+        return (
+            <div className="bg-red-700/20 text-red-300/80 rounded-lg px-2 py-1 text-sm">
+                unavailable
+            </div>
+        );
     }
-}
-
-
-function isBuildingClosed(buildingCode: string) {
-    const currentHour = new Date().getHours();
-    const currentDay = new Date().getDay(); // 0 = Domenica, 1 = Lunedì, ..., 6 = Sabato
-
-    // domenica chiusi tutti i poli tranne poloF e poloPN che fanno 8.30 - 24
-    if (currentDay === 0 && !(buildingCode === 'poloF' || buildingCode === 'poloPN')) {
-        return true;
-    } else if (currentDay === 0 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
-        return currentHour < 8 || currentHour >= 24;
-    }
-
-    // sabato poloA e poloB hanno come orario 7.30 - 14
-    if (currentDay === 6 && (buildingCode === 'poloA' || buildingCode === 'poloB')) {
-        return currentHour < 7 || currentHour >= 14;
-    }
-
-    // il poloC di sabato ha come orario 8 - 13
-    if (currentDay === 6 && buildingCode === 'poloC') {
-        return currentHour < 8 || currentHour >= 13;
-    }
-
-    // poloA e poloB da lunedì a venerdì hanno come orario 7.30 - 20
-    if (currentDay >= 1 && currentDay <= 5 && (buildingCode === 'poloA' || buildingCode === 'poloB')) {
-        return currentHour < 7 || currentHour >= 20;
-    }
-
-
-    // polo C da lunedì a venerdì ha come orario 7.30 - 19.39
-    if (currentDay >= 1 && currentDay <= 5 && buildingCode === 'poloC') {
-        return currentHour < 7 || currentHour >= 19;
-    }
-
-    // poloF e poloPN sono aperti sono aperti dalle 8 alle 24 dal lunedì al sabato
-    if (currentDay >= 1 && currentDay <= 6 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
-        return currentHour < 8 || currentHour >= 24;
-    }
-
-    return false;
 }

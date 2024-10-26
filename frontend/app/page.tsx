@@ -6,31 +6,10 @@ import Map from "@/components/Map";
 import Loading from "@/components/Loading";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-interface Lesson {
-    start: string;
-    end: string;
-    status: string;
-}
-
-interface Room {
-    roomNumber: string;
-    lessons: Lesson[];
-}
-
-interface BuildingData {
-    building: string;
-    building_code: string;
-    building_status: string;
-    rooms: {
-        [key: string]: Room;
-    };
-    coords: [number, number];
-    distance: number;
-}
+import { BuildingData } from "@/types/interfaces";
 
 export default function Home() {
-    const [data, setData] = useState<{ [key: string]: BuildingData }>({}); // Cambiato a BuildingData
+    const [data, setData] = useState<{ [key: string]: BuildingData }>({});
     const [activeBuilding, setActiveBuilding] = useState<string | null>(null);
     const [userPos, setUserPos] = useState<[number, number] | null>(null);
     const [loading, setLoading] = useState(true);
@@ -61,42 +40,39 @@ export default function Home() {
                                 }),
                             });
     
-                            const fetchedData = await res.json();
-    
-                            // Imposta i dati direttamente come oggetto di tipo BuildingData
-                            setData(fetchedData);
-    
-                            //console.log("Data fetched:", fetchedData);
+                            const fetchedData: { [key: string]: BuildingData } = await res.json();
+                            
+                            // Set isClosed for each building
+                            const updatedData = Object.fromEntries(
+                                Object.entries(fetchedData).map(([buildingCode, buildingData]) => [
+                                    buildingCode,
+                                    {
+                                        ...buildingData,
+                                        isClosed: isBuildingClosed(buildingCode),
+                                    },
+                                ])
+                            );
+                            
+                            setData(updatedData);
                         } catch (error) {
                             console.error("Failed to fetch data from backend:", error);
                         } finally {
                             setLoading(false);
                         }
                     },
-                    async (error) => {
-                        console.error("Error fetching location here:", error);
-    
+                    async () => {
                         const res = await fetch("/api/open-classrooms");
-                        const defaultData = await res.json();
-    
-                        // Imposta i dati di default direttamente come oggetto di tipo BuildingData
+                        const defaultData: { [key: string]: BuildingData } = await res.json();
                         setData(defaultData);
-    
-                        console.log("Default data (no location):", defaultData);
                         setLoading(false);
                     }
                 );
             } else {
-                console.error("Geolocation is not supported by this browser.");
                 const res = await fetch("/api/open-classrooms", {
                     method: "GET",
                 });
-                const defaultData = await res.json();
-    
-                // Imposta i dati di default direttamente come oggetto di tipo BuildingData
+                const defaultData: { [key: string]: BuildingData } = await res.json();
                 setData(defaultData);
-    
-                console.log("Default data (no geolocation):", defaultData);
                 setLoading(false);
             }
         };
@@ -139,7 +115,7 @@ export default function Home() {
                         </Alert>
                     </div>
                     <Left
-                        data={data} // TODO : modifica
+                        data={data}
                         activeBuilding={activeBuilding}
                         setActiveBuilding={setActiveBuilding}
                     />
@@ -154,4 +130,45 @@ export default function Home() {
             </div>
         </main>
     );
+}
+
+
+function isBuildingClosed(buildingCode: string) {
+    const currentHour = new Date().getHours();
+    const currentDay = new Date().getDay(); // 0 = Domenica, 1 = Lunedì, ..., 6 = Sabato
+
+    // domenica chiusi tutti i poli tranne poloF e poloPN che fanno 8.30 - 24
+    if (currentDay === 0 && !(buildingCode === 'poloF' || buildingCode === 'poloPN')) {
+        return true;
+    } else if (currentDay === 0 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
+        return currentHour < 8 || currentHour >= 24;
+    }
+
+    // sabato poloA e poloB hanno come orario 7.30 - 14
+    if (currentDay === 6 && (buildingCode === 'poloA' || buildingCode === 'poloB')) {
+        return currentHour < 7 || currentHour >= 14;
+    }
+
+    // il poloC di sabato ha come orario 8 - 13
+    if (currentDay === 6 && buildingCode === 'poloC') {
+        return currentHour < 8 || currentHour >= 13;
+    }
+
+    // poloA e poloB da lunedì a venerdì hanno come orario 7.30 - 20
+    if (currentDay >= 1 && currentDay <= 5 && (buildingCode === 'poloA' || buildingCode === 'poloB')) {
+        return currentHour < 7 || currentHour >= 20;
+    }
+
+
+    // polo C da lunedì a venerdì ha come orario 7.30 - 19.39
+    if (currentDay >= 1 && currentDay <= 5 && buildingCode === 'poloC') {
+        return currentHour < 7 || currentHour >= 19;
+    }
+
+    // poloF e poloPN sono aperti sono aperti dalle 8 alle 24 dal lunedì al sabato
+    if (currentDay >= 1 && currentDay <= 6 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
+        return currentHour < 8 || currentHour >= 24;
+    }
+
+    return false;
 }

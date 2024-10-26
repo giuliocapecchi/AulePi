@@ -78,7 +78,7 @@ export async function POST(req: Request) {
         // Get data from backend
         const data: dataFormat[] = await response.json();
         // Print the data to the console
-        console.log("Data from backend: ", data); 
+        //console.log("Data from backend: ", data); 
 
         return NextResponse.json(data);
     } catch (error) {

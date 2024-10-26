@@ -2,55 +2,33 @@
 import React, { useRef, useEffect, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-
-interface Lesson {
-    start: string; 
-    end: string;
-    status: string;
-}
-
-interface Room {
-    roomNumber: string;
-    lessons: Lesson[]; 
-}
-
-interface BuildingData {
-    building: string;
-    building_code: string;
-    building_status: string;
-    rooms: {
-        [key: string]: Room;
-    };
-    coords: [number, number];
-    distance: number;
-}
+import { BuildingData } from "@/types/interfaces";
 
 export default function Map({
     data,
     handleMarkerClick,
     userPos,
 }: {
-    data: { [key: string]: BuildingData }; // Cambiato per accettare un oggetto
+    data: { [key: string]: BuildingData };
     handleMarkerClick: (building: string) => void;
-    userPos: [number, number] | null; // Specificato il tipo per userPos
+    userPos: [number, number] | null;
 }) {
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
-    const [center, setCenter] = useState<[number, number]>([10.3880886, 43.7207943]); // Coordinate del Polo A
+    const [center, setCenter] = useState<[number, number]>([10.3880886, 43.7207943]);
     const [zoom, setZoom] = useState(16.25);
     const [pitch, setPitch] = useState(52);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
-    function getColorByStatus(status: string) {
-        switch (status) {
-            case "available":
+    function getColorByStatus(status: boolean, isClosed: boolean) {
+        if (status && !isClosed) {
                 return "h-2 w-2 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
-            case "unavailable":
+        }else if(!status && !isClosed){
                 return "h-2 w-2 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
-            default:
-                return "gray";
+        }else{
+            return "h-2 w-2 rounded-full bg-orange-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }
     }
 
@@ -81,11 +59,10 @@ export default function Map({
             }
         });
 
-        // Controlla se data è un oggetto
         if (typeof data === 'object' && data !== null) {
             Object.entries(data).forEach(([buildingCode, building]) => {
                 const el = document.createElement("div");
-                el.className = getColorByStatus(building.building_status);
+                el.className = getColorByStatus(building.free as boolean, building.isClosed as boolean);
 
                 el.addEventListener("click", () => {
                     const accordionItem = document.getElementById(buildingCode);
@@ -101,12 +78,21 @@ export default function Map({
 
                     handleMarkerClick(buildingCode);
                 });
-
-                // Mi assicuro di avere le coordinate
-                if (mapRef.current && building.coords) {
-                    new mapboxgl.Marker(el)
-                        .setLngLat([building.coords[0], building.coords[1]])
+                
+                //console.log(building);
+                if (mapRef.current && building.coordinates) {
+                    // get the building coordinates
+                    const marker = new mapboxgl.Marker(el)
+                        .setLngLat(building.coordinates as [number, number])
                         .addTo(mapRef.current);
+
+                    // Create a popup to show the label
+                    const popup = new mapboxgl.Popup({ offset: 25 })
+                        .setHTML(`<div class="text-sm">${buildingCode.replace("polo", "Polo ")}</div>`)
+                        .setLngLat(building.coordinates as [number, number]);
+
+                    // Bind the popup to the marker
+                    marker.setPopup(popup);
                 }
             });
         } else {
