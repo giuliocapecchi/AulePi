@@ -74,9 +74,13 @@ def get_open_classrooms():
 
     except FileNotFoundError:
         print("Calendari non trovati, procedo con il download")
-        # svuota la cartella ./calendari
-        for file in os.listdir("./calendari"):
-            os.remove(f"./calendari/{file}")
+        # se la cartella ./calendari non esiste, la crea
+        if not os.path.exists("./calendari"):
+            os.makedirs("./calendari")
+        else:
+            # svuota la cartella ./calendari
+            for file in os.listdir("./calendari"):
+                os.remove(f"./calendari/{file}")
         # scarica i calendari
         unipi_calendar.get_unipi_calendars()
 
