@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import requests
 
@@ -24,12 +24,21 @@ def get_unipi_calendars():
             "Accept": "application/json, text/plain, */*",
         }
 
+       
+        # Ottieni la data di oggi in formato UTC
+        today = datetime.now(timezone.utc).date()
+
+        # Crea le date esatte come descritto
+        dataDa = (today - timedelta(days=1)).strftime("%Y-%m-%d") + "T22:00:00.000Z"
+        dataA = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T22:59:59.999Z"
+        dataScadenza = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T23:00:00.000Z"
+
         # Payload per la richiesta
         data = {
-            "dataDa": "2024-10-23T22:00:00.000Z",
-            "dataA": "2024-10-25T21:59:59.999Z",
             "clienteId": "628de8b9b63679f193b87046",
-            "dataScadenza": "2024-10-25T22:00:00.000Z",
+            "dataA": dataA,
+            "dataDa": dataDa,
+            "dataScadenza": dataScadenza,
             "linkCalendarioId": poli_calendar_ids[polo],
         }
 
