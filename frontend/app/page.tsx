@@ -90,9 +90,12 @@ export default function Home() {
                 <div className="w-full h-20 pl-8 pr-4 hidden sm:flex sm:justify-between items-center">
                     <Image
                         src={"/logo.svg"}
-                        width={200}
-                        height={200}
+                        width="0"
+                        height="0"
+                        sizes="100vw"
+                        style={{ width: '200px', height: 'auto' }}
                         alt="Logo"
+                        priority = {true}
                     />
                     <Alert className="h-fit text-pretty w-40">
                         <AlertDescription>
@@ -104,9 +107,12 @@ export default function Home() {
                     <div className="w-full h-20 pl-8 pr-4 flex sm:hidden justify-between items-center">
                         <Image
                             src={"/logo.svg"}
-                            width={180}
-                            height={200}
+                            width="0"
+                            height="0"
+                            sizes="100vw"
+                            style={{ width: '200px', height: 'auto' }}
                             alt="Logo"
+                            priority = {true}
                         />
                         <Alert className="h-fit text-pretty w-40">
                             <AlertDescription>

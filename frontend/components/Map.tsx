@@ -24,11 +24,11 @@ export default function Map({
 
     function getColorByStatus(status: boolean, isClosed: boolean) {
         if (status && !isClosed) {
-                return "h-2 w-2 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
+                return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
         }else if(!status && !isClosed){
-                return "h-2 w-2 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+                return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }else{
-            return "h-2 w-2 rounded-full bg-orange-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+            return "h-3 w-3 rounded-full bg-orange-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }
     }
 
