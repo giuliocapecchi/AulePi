@@ -62,11 +62,21 @@ export default function Map({
         if (typeof data === 'object' && data !== null) {
             Object.entries(data).forEach(([buildingCode, building]) => {
                 const el = document.createElement("div");
-                el.className = getColorByStatus(building.free as boolean, building.isClosed as boolean);
+                el.className = "relative"; // Use relative positioning for the marker
+
+                // Create the marker circle
+                const markerCircle = document.createElement("div");
+                markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean);
+                el.appendChild(markerCircle);
+
+                // Create the label
+                const label = document.createElement("div");
+                label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded"; // Adjusted styles
+                label.innerText = buildingCode.replace("polo", "Polo "); // Adjust the label text as needed
+                el.appendChild(label);
 
                 el.addEventListener("click", () => {
                     const accordionItem = document.getElementById(buildingCode);
-
                     setTimeout(() => {
                         if (accordionItem) {
                             accordionItem.scrollIntoView({
@@ -75,24 +85,13 @@ export default function Map({
                             });
                         }
                     }, 300);
-
                     handleMarkerClick(buildingCode);
                 });
-                
-                //console.log(building);
+
                 if (mapRef.current && building.coordinates) {
-                    // get the building coordinates
-                    const marker = new mapboxgl.Marker(el)
+                    new mapboxgl.Marker(el)
                         .setLngLat(building.coordinates as [number, number])
                         .addTo(mapRef.current);
-
-                    // Create a popup to show the label
-                    const popup = new mapboxgl.Popup({ offset: 25 })
-                        .setHTML(`<div class="text-sm">${buildingCode.replace("polo", "Polo ")}</div>`)
-                        .setLngLat(building.coordinates as [number, number]);
-
-                    // Bind the popup to the marker
-                    marker.setPopup(popup);
                 }
             });
         } else {
