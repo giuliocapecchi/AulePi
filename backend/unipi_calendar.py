@@ -178,21 +178,27 @@ def get_buildings_status(lessons):
     
 
     # Apri il file aule.csv in modalità lettura
-    with open("./calendari/aule.csv", 'r') as f:
-        reader = csv.reader(f)
-        next(reader)  # Salta l'intestazione
-        for row in reader:
-            polo = row[0]
-            location = row[1]
-            free = row[2] == 'True'
-            if polo not in buildings_status:
-                buildings_status[polo] = {}
-                buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            if location not in buildings_status[polo]:
-                buildings_status[polo][location] = {
-                    'lessons': [],
-                    'free': free
-                }
+    try:
+        with open("./aule.csv", 'r') as f:
+            reader = csv.reader(f)
+            next(reader)  # Salta l'intestazione
+            for row in reader:
+                polo = row[0]
+                location = row[1]
+                free = row[2] == 'True'
+                if polo not in buildings_status:
+                    buildings_status[polo] = {}
+                    buildings_status[polo]['coordinates'] = poli_coordinates[polo]
+                if location not in buildings_status[polo]:
+                    buildings_status[polo][location] = {
+                        'lessons': [],
+                        'free': free
+                    }
+    except FileNotFoundError:
+        print("File aule.csv non trovato, verrà creato")
+        with open("./aule.csv", 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["polo", "aula", "usually_open"])
 
 
     # Itera su tutte le lezioni
@@ -251,7 +257,7 @@ def get_buildings_status(lessons):
 
 def building_to_csv(buildings_status):
     aule_esistenti = set()
-    file_path = "./calendari/aule.csv"
+    file_path = "./aule.csv"
 
     # Se il file esiste, carica le aule già presenti
     if os.path.exists(file_path):
