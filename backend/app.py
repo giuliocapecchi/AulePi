@@ -1,7 +1,5 @@
 from flask import Flask, jsonify, request
 from datetime import datetime, timezone
-import requests
-import json
 import math
 import unipi_calendar
 import os

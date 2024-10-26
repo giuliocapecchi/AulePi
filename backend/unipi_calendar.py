@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timedelta, timezone
 import os
 import requests
+import csv
 
 
 def get_unipi_calendars():
@@ -64,6 +65,8 @@ def get_unipi_calendars():
                     for chunk in response_impegni.iter_content(chunk_size=8192):
                         f.write(chunk)
                 print("File scaricato correttamente come './calendari/calendario_"+polo+"_"+today+".ics")
+                
+                building_to_csv(get_buildings_status(load_calendars_and_parse()))
             else:
                 print(f"Errore nel download del calendario per il polo "+polo+": {response_impegni.status_code}")
         else:
@@ -74,6 +77,11 @@ def get_unipi_calendars():
 
 
 def parse_ics(ics_file):
+    # rimuovi dal file tutti i caratteri '\n ' (newline e spazio) ma SOLO SE ADIACENTI
+    ics_file = re.sub(r'\n ', '', ics_file)
+    # sostituisci \u00c3\u00a0 con à
+    ics_file = ics_file.replace("\u00c3\u00a0", "à")
+
     events = ics_file.split("BEGIN:VEVENT")
     parsed_events = []
     
@@ -190,8 +198,9 @@ def get_buildings_status(lessons):
 
         # Confronta l'orario per selezionare lezioni future o in corso oggi
         if start_time.date() == now.date() and end_time > now:
-            # rimuovi tutte le '\' da 'lesson['professor']
+            # rimuovi tutte le '\' da 'lesson['professor'] e da 'lesson['summary']'
             lesson['professor'] = lesson['professor'].replace("\\", "")
+            lesson['summary'] = lesson['summary'].replace("\\", "")
             # rimuovi '\nNOTE:'
             lesson['professor'] = lesson['professor'].split("\nNOTE:")[0]
             buildings_status[polo][location]['lessons'].append({
@@ -218,3 +227,36 @@ def get_buildings_status(lessons):
             buildings_status[polo]['free'] = True
 
     return buildings_status
+
+
+
+def building_to_csv(buildings_status):
+    aule_esistenti = set()
+    file_path = "./calendari/aule.csv"
+
+    # Se il file esiste, carica le aule già presenti
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            reader = csv.reader(f)
+            next(reader)  # Salta l'intestazione
+            for row in reader:
+                if len(row) >= 2:
+                    aule_esistenti.add((row[0], row[1]))
+
+    # Aggiungi solo le aule che non sono già presenti
+    with open(file_path, 'a', newline='') as f:
+        writer = csv.writer(f)
+        
+        # Scrivi l'intestazione se il file è vuoto
+        if os.stat(file_path).st_size == 0:
+            writer.writerow(["polo", "aula", "usually_open"])
+            
+        # Itera su buildings_status e aggiungi le nuove aule
+        for polo in buildings_status:
+            for location in buildings_status[polo]:
+                if location not in ['coordinates', 'free']:
+                    aula = (polo, location)
+                    # Controlla se l'aula è già presente
+                    if aula not in aule_esistenti:
+                        writer.writerow([polo, location, buildings_status[polo][location]['free']])
+                        aule_esistenti.add(aula)  # Aggiungi l'aula al set per evitare duplicati
