@@ -39,6 +39,14 @@ export default function Home() {
                                     lng: longitude,
                                 }),
                             });
+
+                            // Controlla se la risposta non è 200
+                            if (!res.ok) {
+                                const errorData = await res.json();
+                                throw new Error(errorData.error || 'Unknown error occurred');
+                            }
+
+                        
     
                             const fetchedData: { [key: string]: BuildingData } = await res.json();
                             

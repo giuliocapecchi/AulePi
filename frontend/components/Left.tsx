@@ -9,7 +9,7 @@ import {
 
 import { Lesson, BuildingData } from "@/types/interfaces";
 
-const errorData: BuildingData = {
+const errorData: BuildingData = { // Valori fittizi per il building in caso di errore
     building: "Error",
     building_code: "ERROR_CODE",
     building_status: "Internal Server Error",
