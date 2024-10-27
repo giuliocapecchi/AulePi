@@ -99,7 +99,7 @@ export default function Home() {
             <div className="basis-2/5 sm:h-full order-last sm:order-first py-4 sm:px-0 sm:py-2 overflow-hidden sm:flex sm:flex-col">
                 <div className="w-full h-20 pl-8 pr-4 hidden sm:flex sm:justify-between items-center">
                     <Image
-                        src={"/logo.svg"}
+                        src={"/logo.png"}
                         width="0"
                         height="0"
                         sizes="100vw"
@@ -116,7 +116,7 @@ export default function Home() {
                 <ScrollArea className="h-full">
                     <div className="w-full h-20 pl-8 pr-4 flex sm:hidden justify-between items-center">
                         <Image
-                            src={"/logo.svg"}
+                            src={"/logo.png"}
                             width="0"
                             height="0"
                             sizes="100vw"
