@@ -131,13 +131,11 @@ function formatTime(timeString: string) {
 function getAvailabilityDiv(building: BuildingData): JSX.Element {
     if (building.isClosed) {
         return (
-            <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-red-300/90">
+            <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
                 closed
             </div>
         );
-    }
-
-    if (building.free) {
+    } else if (building.free) {
         return (
             <div className="bg-green-800/20 text-green-300/90 rounded-lg px-2 py-1 text-sm">
                 rooms available
@@ -145,7 +143,7 @@ function getAvailabilityDiv(building: BuildingData): JSX.Element {
         );
     } else {
         return (
-            <div className="bg-red-700/20 text-red-300/80 rounded-lg px-2 py-1 text-sm">
+            <div className="bg-red-700/20 text-orange-300/80 rounded-lg px-2 py-1 text-sm">
                 unavailable
             </div>
         );

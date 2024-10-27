@@ -26,9 +26,9 @@ export default function Map({
         if (status && !isClosed) {
                 return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
         }else if(!status && !isClosed){
-                return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+                return "h-3 w-3 rounded-full bg-orange-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }else{
-            return "h-3 w-3 rounded-full bg-orange-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+            return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }
     }
 
@@ -76,16 +76,18 @@ export default function Map({
                 el.appendChild(label);
 
                 el.addEventListener("click", () => {
-                    const accordionItem = document.getElementById(buildingCode);
-                    setTimeout(() => {
-                        if (accordionItem) {
-                            accordionItem.scrollIntoView({
-                                behavior: "smooth",
-                                block: "start",
-                            });
-                        }
-                    }, 300);
-                    handleMarkerClick(buildingCode);
+                    if(!building.isClosed){
+                        const accordionItem = document.getElementById(buildingCode);
+                        setTimeout(() => {
+                            if (accordionItem) {
+                                accordionItem.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                });
+                            }
+                        }, 300);
+                        handleMarkerClick(buildingCode);
+                    }
                 });
 
                 if (mapRef.current && building.coordinates) {
@@ -130,14 +132,14 @@ export default function Map({
                     </div>
                 </div>
                 <div className="flex items-center gap-0">
-                    <div className="h-2 w-2 rounded-full bg-orange-400 flex-none"></div>
-                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-red-300/90">
+                    <div className="h-2 w-2 rounded-full bg-red-400 flex-none"></div>
+                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
                         closed
                     </div>
                 </div>
                 <div className="flex items-center gap-0">
-                    <div className="h-2 w-2 rounded-full bg-red-400 flex-none"></div>
-                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
+                    <div className="h-2 w-2 rounded-full bg-orange-400 flex-none"></div>
+                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-orange-300/90">
                         unavailable
                     </div>
                 </div>
