@@ -18,7 +18,7 @@ interface dataFormat {
     distance: number;  // Distanza dalla posizione attuale, se calcolata
 }
 
-
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export async function POST(req: Request) {
     try {
@@ -26,8 +26,9 @@ export async function POST(req: Request) {
         const { lat, lng } = await req.json();
 
         // Send the user location to the backend
+        console.log("backend url in route.ts: ", backendUrl);
         const response = await fetch(
-            process.env.BACKEND_URL+"/api/open-classrooms", // TODO : Change this to the backend URL
+            backendUrl+"/api/open-classrooms",
             {
                 method: "POST",
                 headers: {
@@ -61,9 +62,10 @@ export async function POST(req: Request) {
 
 export async function GET() {
     try {
+        console.log("backend url in route.ts: ", backendUrl);
         // Fetch the default data without location
         const response = await fetch(
-            process.env.BACKEND_URL+"/api/open-classrooms",
+            backendUrl+"/api/open-classrooms",
             {
                 method: "GET",
                 cache: "no-cache",
