@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import math
 import unipi_calendar
 
@@ -8,6 +9,8 @@ app = Flask(__name__)
 
 
 calendari = {} # chiavi : 'date' , 'lessons'
+pisa_timezone = ZoneInfo("Europe/Rome")
+
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
@@ -17,25 +20,9 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c 
 
-def get_slot_status(current_time, start_time_str, end_time_str):
-    start_time = datetime.strptime(start_time_str, "%H:%M:%S").time()
-    end_time = datetime.strptime(end_time_str, "%H:%M:%S").time()
-
-    time_until = datetime.combine(datetime.today(), start_time) - datetime.combine(datetime.today(), current_time)
-    time_until = time_until.total_seconds() / 60
-
-    if time_until > 0 and time_until < 20:
-        return "upcoming"
-    elif start_time <= current_time <= end_time:
-        return "available"
-    elif current_time > end_time:
-        return "passed"
-    else:
-        return "unavailable"
-    
 
 def update_calendars():
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(pisa_timezone).date()
     today = today.strftime("%Y-%m-%d")
 
     if calendari == {} or calendari['date'] != today:
