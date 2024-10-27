@@ -1,9 +1,63 @@
 import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo  # Python 3.9+
-import os
+import io
 import requests
 import csv
+import vercel_blob
+from dotenv import load_dotenv
+
+
+files = {} # Contiene i calendari (scaricati all'avvio del backend)
+aule_csv_content = None # contiene il file 'aule.csv' presente server-side. 
+
+# ----------------------------- VercelFS utility functions ------------------------------------------------- #
+
+def list_all_blobs():
+    blobs = vercel_blob.list({
+        'limit': '5',
+    })
+    return blobs
+
+
+def upload_a_blob(file_name, file_content):
+    file_content_bytes = file_content.encode('utf-8')  # Codifica la stringa in bytes
+    resp = vercel_blob.put(file_name, file_content_bytes, {
+                "addRandomSuffix": "false",
+            })
+    print("Vercel response : ",resp,"\n")
+
+
+def download_file_from_vercelFS(filename):
+    global aule_csv_content
+    blobs = list_all_blobs()
+    for blob in blobs['blobs']:
+        if blob['pathname'] == filename:
+            response = requests.get(blob['url'])
+            if response.status_code == 200:
+                aule_csv_content = response.content.decode('utf-8')
+                print(f"{filename} caricato in memoria con successo.")
+                print(aule_csv_content)
+                return
+            else:
+                print(f"Errore nel download di {filename}: {response.status_code}")
+                return
+    print(f"{filename} non trovato nei blob.")
+
+
+def delete_blob_by_filename(filename):
+    # Trova l'URL del blob utilizzando il nome del file
+    blobs = list_all_blobs()
+    for blob in blobs['blobs']:
+        if blob['pathname'] == filename:
+            # Elimina il blob se trovato
+            resp = vercel_blob.delete(blob['url'])
+            print(f"Eliminato {filename}: {resp}")
+    else:
+        print(f"File {filename} non trovato.")
+
+
+# ----------------------------- functions to interact with the university of Pisa APIs ------------------------------------------------- #
 
 
 def get_unipi_calendars():
@@ -58,22 +112,19 @@ def get_unipi_calendars():
             response_impegni = requests.get(final_url, stream=True)
             
             if response_impegni.status_code == 200:
-                # Salva il file scaricato
+                # Aggiungi il file alla variabile globale
                 today = datetime.now(timezone.utc).date()
                 # Converti today to string
-                today = today.strftime("%Y-%m-%d")
-                with open("./calendari/calendario_"+polo+"_"+today+".ics", 'wb') as f:
-                    for chunk in response_impegni.iter_content(chunk_size=8192):
-                        f.write(chunk)
-                print("File scaricato correttamente come './calendari/calendario_"+polo+"_"+today+".ics")
-                
-                building_to_csv(get_buildings_status(load_calendars_and_parse()))
+                today_str = today.strftime("%Y-%m-%d")
+                file_name = f"calendario_{polo}_{today_str}.ics"
+                file_content = response_impegni.text
+                # aggiungi il file e il suo contenuto alla variabile globale 
+                files[file_name] = file_content
             else:
                 print(f"Errore nel download del calendario per il polo "+polo+": {response_impegni.status_code}")
         else:
             print(f"Errore nella creazione del filtro: {response.status_code}")
             print(response.text)
-
 
 
 
@@ -133,51 +184,41 @@ def parse_ics(ics_file):
     return parsed_events
 
 
-def parse_and_adjust_time(dtstart):
-    # Parsing del formato stringa "YYYYMMDDTHHMMSSZ"
-    dt = datetime.strptime(dtstart, "%Y%m%dT%H%M%SZ").replace(tzinfo=ZoneInfo("Europe/Rome"))
-    
-    # Controllo dell'ora legale/solare
-    if dt.dst() != timedelta(0):  # Se siamo in ora legale
-        dt += timedelta(hours=2)
-    else: # Se siamo in ora solare
-        dt += timedelta(hours=1)
-    
+
+def parse_and_adjust_time(dt):
+    dt = dt[:4] + "-" + dt[4:6] + "-" + dt[6:8] + " " + dt[9:11] + ":" + dt[11:13] + ":" + dt[13:15]
+    # Parsing della stringa in UTC
+    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    # Conversione in ora locale (Europa/Roma)
+    dt = dt.astimezone(ZoneInfo("Europe/Rome"))
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
+
 def load_calendars_and_parse():
-    all_lessons = []  # Lista per accumulare tutte le lezioni
+    get_unipi_calendars()
+    all_lessons = []  # Lista per accumulare tutte le lezioni    
+    # Itera sui nomi dei file .ics dalla variabile globale
+    for filename in files:
+        # Parsare gli eventi
+        lessons = parse_ics(files[filename])
 
-    # Itera sui file nella cartella ./calendari
-    for filename in os.listdir('./calendari'):
-        # Controlla se il file ha l'estensione .ics
-        if filename.endswith('.ics'):
-            # Estrai il nome del polo dal nome del file
-            # Esempio di nome del file: calendario_poloA_2024-10-25.ics
-            parts = filename.split('_')
-            if len(parts) >= 3:
-                polo = parts[1]  # 'poloA', 'poloB', etc.
+        # Aggiungi ad ogni lesson il polo
+        polo = filename.split('_')[1]  # Estrai il polo dal nome del file
+        for lesson in lessons:
+            lesson['polo'] = polo
 
-                with open(f'./calendari/{filename}', 'r') as f:
-                    ics_file = f.read()
-
-                # Parsare gli eventi
-                lessons = parse_ics(ics_file)
-
-                # Aggiungi ad ogni lesson il polo
-                for lesson in lessons:
-                    lesson['polo'] = polo
-
-                # Aggiungi le lezioni del file corrente alla lista totale
-                all_lessons.extend(lessons)
-
+        # Aggiungi le lezioni del file corrente alla lista totale
+        all_lessons.extend(lessons)
+    print("Calendari caricati con successo.")
+    load_dotenv()
+    download_file_from_vercelFS("aule.csv")
+    building_to_csv(get_buildings_status(all_lessons)) # Aggiungi i poli aggiornati al csv lato VercelFS    
     return all_lessons  # Restituisci tutte le lezioni accumulate
 
 
-
-
 def get_buildings_status(lessons):
+    global aule_csv_content
     now = datetime.now()
     buildings_status = {}
     poli_coordinates = {
@@ -188,30 +229,34 @@ def get_buildings_status(lessons):
             'poloPN': [10.391229871075552, 43.72584890979181]}
     
 
-    # Apri il file aule.csv in modalità lettura
     try:
-        with open("./aule.csv", 'r') as f:
-            reader = csv.reader(f)
-            next(reader)  # Salta l'intestazione
-            for row in reader:
-                polo = row[0]
-                location = row[1]
-                free = row[2] == 'True'
-                if polo not in buildings_status:
-                    buildings_status[polo] = {}
-                    buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-                if location not in buildings_status[polo]:
-                    buildings_status[polo][location] = {
-                        'lessons': [],
-                        'free': free
+        f = io.StringIO(aule_csv_content) # Per trattare la stringa come se fosse un file
+        reader = csv.reader(f)
+        next(reader)  # Salta l'intestazione
+        for row in reader:
+            polo = row[0]
+            location = row[1]
+            free = row[2] == 'True'
+            if polo not in buildings_status:
+                buildings_status[polo] = {}
+                buildings_status[polo]['coordinates'] = poli_coordinates[polo]
+            if location not in buildings_status[polo]:
+                buildings_status[polo][location] = {
+                    'lessons': [],
+                    'free': free
                     }
-    except FileNotFoundError:
-        print("File aule.csv non trovato, verrà creato")
-        with open("./aule.csv", 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(["polo", "aula", "usually_open"])
+        f.close()
 
-
+    except:
+        print("File 'aule.csv' non trovato su VercelFS, verrà creato e caricato.")
+        f = io.StringIO() # Usiamo io per trattare la stringa come se fosse un file
+        writer = csv.writer(f)
+        writer.writerow(["polo", "aula", "usually_open"])
+        aule_csv_content = f.getvalue()
+        upload_a_blob("aule.csv", aule_csv_content)
+        f.close()
+    
+    
     # Itera su tutte le lezioni
     for lesson in lessons:
         polo = lesson['polo']
@@ -267,32 +312,54 @@ def get_buildings_status(lessons):
 
 
 def building_to_csv(buildings_status):
+    global aule_csv_content
     aule_esistenti = set()
-    file_path = "./aule.csv"
+    changes = False
 
-    # Se il file esiste, carica le aule già presenti
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            reader = csv.reader(f)
-            next(reader)  # Salta l'intestazione
-            for row in reader:
-                if len(row) >= 2:
-                    aule_esistenti.add((row[0], row[1]))
+    # Se il file esiste, carica le aule già presenti nel set
+    if aule_csv_content:
+        f = io.StringIO(aule_csv_content)
+        reader = csv.reader(f)
+        next(reader)  # Salta l'intestazione
+        for row in reader:
+            if len(row) >= 2:
+                aule_esistenti.add((row[0], row[1]))
+        f.close()
+
+    # Creo un nuovo buffer per la scrittura
+    f = io.StringIO()
+    writer = csv.writer(f)
+
+    # Scrivi l'intestazione se il contenuto è vuoto
+    if not aule_csv_content:
+        writer.writerow(["polo", "aula", "usually_open"])
+    
+    # Aggiungi le aule esistenti
+    if aule_csv_content:
+        existing_data = io.StringIO(aule_csv_content)
+        existing_reader = csv.reader(existing_data)
+        writer.writerow(next(existing_reader))  # Scrive l'intestazione
+        for row in existing_reader:
+            writer.writerow(row)  # Scrive le righe esistenti
+        existing_data.close()
 
     # Aggiungi solo le aule che non sono già presenti
-    with open(file_path, 'a', newline='') as f:
-        writer = csv.writer(f)
-        
-        # Scrivi l'intestazione se il file è vuoto
-        if os.stat(file_path).st_size == 0:
-            writer.writerow(["polo", "aula", "usually_open"])
-            
-        # Itera su buildings_status e aggiungi le nuove aule
-        for polo in buildings_status:
-            for location in buildings_status[polo]:
-                if location not in ['coordinates', 'free']:
-                    aula = (polo, location)
-                    # Controlla se l'aula è già presente
-                    if aula not in aule_esistenti:
-                        writer.writerow([polo, location, buildings_status[polo][location]['free']])
-                        aule_esistenti.add(aula)  # Aggiungi l'aula al set per evitare duplicati
+    for polo in buildings_status:
+        for location in buildings_status[polo]:
+            if location not in ['coordinates', 'free']:
+                aula = (polo, location)
+                # Controlla se l'aula è già presente
+                if aula not in aule_esistenti:
+                    writer.writerow([polo, location, buildings_status[polo][location]['free']])
+                    aule_esistenti.add(aula)  # Aggiungi l'aula al set per evitare duplicati
+                    changes = True  # Imposta il flag su True perché c'è una modifica
+
+    # Se ci sono state modifiche, aggiorna `aule_csv_content` e aggiorna il file server-side
+    if changes:
+        print("Ci sono stati dei cambiamenti, faccio un upload del nuovo 'aule.csv' su VercelFS.")
+        aule_csv_content = f.getvalue()
+        # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
+        # quindi non serve la delete del file
+        upload_a_blob("aule.csv", aule_csv_content)
+
+    f.close()

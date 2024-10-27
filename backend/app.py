@@ -2,9 +2,12 @@ from flask import Flask, jsonify, request
 from datetime import datetime, timezone
 import math
 import unipi_calendar
-import os
+
 
 app = Flask(__name__)
+
+
+calendari = {} # chiavi : 'date' , 'lessons'
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
@@ -31,9 +34,20 @@ def get_slot_status(current_time, start_time_str, end_time_str):
         return "unavailable"
     
 
+def update_calendars():
+    today = datetime.now(timezone.utc).date()
+    today = today.strftime("%Y-%m-%d")
+
+    if calendari == {} or calendari['date'] != today:
+        print("Calendari non presenti o non aggiornati")
+        # scarico i calendari e li aggiungo al dizionario globale
+        calendari['date'] = today
+        calendari['lessons'] = unipi_calendar.load_calendars_and_parse()
+    
+
 @app.get('/')
 def hello_world():
-    return "Backend flask server for the AulePi project"
+    return "Backend flask server for the AulePi project."
     
     
 
@@ -64,32 +78,14 @@ def get_open_classrooms():
         if user_lat is None or user_lng is None:
             return jsonify({"error": "Invalid location data. 'lat' and 'lng' are required."}), 400
         
-
-    # se ./calendario_poloF_DATAODIERNA.ics non esiste, scarica i calendari
-    today = datetime.now(timezone.utc).date()
-    today = today.strftime("%Y-%m-%d")
-    try:
-        with open("./calendari/calendario_poloF_"+today+".ics", 'r') as f:
-            print("Calendari trovati, evito il download")
-
-    except FileNotFoundError:
-        print("Calendari non trovati, procedo con il download")
-        # se la cartella ./calendari non esiste, la crea
-        if not os.path.exists("./calendari"):
-            os.makedirs("./calendari")
-        else:
-            # svuota la cartella ./calendari
-            for file in os.listdir("./calendari"):
-                os.remove(f"./calendari/{file}")
-        # scarica i calendari
-        unipi_calendar.get_unipi_calendars()
-
-    lessons = unipi_calendar.load_calendars_and_parse()
-    buildings_status = unipi_calendar.get_buildings_status(lessons)
-
+    update_calendars() # la funzione controlla se i calendari sono già stati aggiornati per la data odierna. Se non lo sono esegue l'aggiornamento
+    buildings_status = unipi_calendar.get_buildings_status(calendari['lessons'])
     return jsonify(buildings_status)
+
 
 
 if __name__ == '__main__':
     #app.run(host='0.0.0.0', port=8080, debug=True)
+    update_calendars()
     app.run(port=8080)
+    

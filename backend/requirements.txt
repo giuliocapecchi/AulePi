@@ -11,3 +11,5 @@ MarkupSafe==3.0.2
 requests==2.32.3
 urllib3==2.2.3
 Werkzeug==3.0.4
+vercel_blob==0.3.0
+python-dotenv==1.0.1
