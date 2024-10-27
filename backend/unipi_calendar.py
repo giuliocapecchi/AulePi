@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 
 
 files = {} # Contiene i calendari (scaricati all'avvio del backend)
-aule_csv_content = None # contiene il file 'aule.csv' presente server-side. 
+aule_csv_content = None # contiene il file 'aule.csv' presente server-side.
+pisa_timezone = ZoneInfo("Europe/Rome") 
 
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
 
@@ -82,7 +83,7 @@ def get_unipi_calendars():
 
        
         # Ottieni la data di oggi in formato UTC
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(pisa_timezone).date()
 
         # Crea le date esatte come descritto
         dataDa = (today - timedelta(days=1)).strftime("%Y-%m-%d") + "T22:00:00.000Z"
@@ -113,7 +114,7 @@ def get_unipi_calendars():
             
             if response_impegni.status_code == 200:
                 # Aggiungi il file alla variabile globale
-                today = datetime.now(timezone.utc).date()
+                today = datetime.now(pisa_timezone).date()
                 # Converti today to string
                 today_str = today.strftime("%Y-%m-%d")
                 file_name = f"calendario_{polo}_{today_str}.ics"
@@ -138,7 +139,7 @@ def parse_ics(ics_file):
     parsed_events = []
     
     # Ottieni la data odierna nel formato 'YYYY-MM-DD'
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(pisa_timezone).date()
     for event in events[1:]:
         # Trova la descrizione, se esiste
         description_match = re.search(r'DESCRIPTION:(.*?)\n', event)
@@ -219,7 +220,7 @@ def load_calendars_and_parse():
 
 def get_buildings_status(lessons):
     global aule_csv_content
-    now = datetime.now()
+    now = datetime.now(pisa_timezone)
     buildings_status = {}
     poli_coordinates = {
             'poloA' : [10.389842986424895, 43.72105258709789],
@@ -261,8 +262,8 @@ def get_buildings_status(lessons):
     for lesson in lessons:
         polo = lesson['polo']
         location = lesson['location']
-        start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S')
-        end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S')
+        start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').astimezone(pisa_timezone)
+        end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').astimezone(pisa_timezone)
 
         # Crea la struttura per il polo se non esiste già
         if polo not in buildings_status:
