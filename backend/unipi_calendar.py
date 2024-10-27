@@ -1,5 +1,6 @@
 import re
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo  # Python 3.9+
 import os
 import requests
 import csv
@@ -95,10 +96,7 @@ def parse_ics(ics_file):
         # Trova l'inizio, se esiste
         dtstart_match = re.search(r'DTSTART:(.*?)\n', event)
         dtstart = dtstart_match.group(1) if dtstart_match else "No start time"
-        # Rendi dtstart leggibile, per esempio 20241025T123000Z deve diventare 2024-10-25 12:30:00
-        dtstart = dtstart[:4] + "-" + dtstart[4:6] + "-" + dtstart[6:8] + " " + dtstart[9:11] + ":" + dtstart[11:13] + ":" + dtstart[13:15]
-        # Shifta di 2 ore avanti tutti gli eventi
-        dtstart = dtstart[:11] + str(int(dtstart[11:13]) + 2) + dtstart[13:]
+        dtstart = parse_and_adjust_time(dtstart)
 
         # Confronta la data di inizio con la data odierna
         event_date = dtstart.split(" ")[0]  # Ottieni solo la data
@@ -108,14 +106,14 @@ def parse_ics(ics_file):
         # Trova la fine, se esiste
         dtend_match = re.search(r'DTEND:(.*?)\n', event)
         dtend = dtend_match.group(1) if dtend_match else "No end time"
-        # Rendi dtend leggibile
-        dtend = dtend[:4] + "-" + dtend[4:6] + "-" + dtend[6:8] + " " + dtend[9:11] + ":" + dtend[11:13] + ":" + dtend[13:15]
-        # Shifta di 2 ore avanti tutti gli eventi
-        dtend = dtend[:11] + str(int(dtend[11:13]) + 2) + dtend[13:]
+        dtend = parse_and_adjust_time(dtend)
 
         # Trova il titolo, se esiste
         summary_match = re.search(r'SUMMARY:(.*?)\n', event)
         summary = summary_match.group(1) if summary_match else "No summary"
+        # if 'no description', metto il summary nella description ma solo se il summary è più corto di 30 caratteri
+        if description == "No description" and len(summary) < 20:
+            description = summary
         
         # Trova la location, se esiste
         location_match = re.search(r'LOCATION:(.*?)\n', event)
@@ -133,6 +131,19 @@ def parse_ics(ics_file):
         })
     
     return parsed_events
+
+
+def parse_and_adjust_time(dtstart):
+    # Parsing del formato stringa "YYYYMMDDTHHMMSSZ"
+    dt = datetime.strptime(dtstart, "%Y%m%dT%H%M%SZ").replace(tzinfo=ZoneInfo("Europe/Rome"))
+    
+    # Controllo dell'ora legale/solare
+    if dt.dst() != timedelta(0):  # Se siamo in ora legale
+        dt += timedelta(hours=2)
+    else: # Se siamo in ora solare
+        dt += timedelta(hours=1)
+    
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def load_calendars_and_parse():
