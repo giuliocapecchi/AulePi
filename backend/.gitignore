@@ -5,3 +5,4 @@ output.json
 webscrape.py
 *.ics
 *.csv
+*.env
