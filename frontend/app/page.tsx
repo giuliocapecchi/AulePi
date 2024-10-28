@@ -7,7 +7,7 @@ import Loading from "@/components/Loading";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BuildingData } from "@/types/interfaces";
-import { Analytics } from "@vercel/analytics/react"
+import { Analytics } from "@vercel/analytics/react" // Import the Analytics component for Vercel Analytics
 
 
 export default function Home() {
@@ -96,7 +96,7 @@ export default function Home() {
 
     return (
         <main className="flex flex-col sm:flex-row sm:gap-4 h-screen">
-            <div className="basis-2/5 sm:h-full order-last sm:order-first py-4 sm:px-0 sm:py-2 overflow-hidden sm:flex sm:flex-col">
+            <div className="basis-2/5 sm:h-full order-last sm:order-first py-4 sm:px-0 sm:py-2 flex flex-col">
                 <div className="w-full h-20 pl-8 pr-4 hidden sm:flex sm:justify-between items-center">
                     <Image
                         src={"/logo.png"}
@@ -105,7 +105,8 @@ export default function Home() {
                         sizes="100vw"
                         style={{ width: '200px', height: 'auto' }}
                         alt="Logo"
-                        priority = {true}
+                        priority={true}
+                        fetchPriority="high"
                     />
                     <Alert className="h-fit text-pretty w-40">
                         <AlertDescription>
@@ -113,29 +114,25 @@ export default function Home() {
                         </AlertDescription>
                     </Alert>
                 </div>
-                <ScrollArea className="h-full">
-                    <div className="w-full h-20 pl-8 pr-4 flex sm:hidden justify-between items-center">
-                        <Image
-                            src={"/logo.png"}
-                            width="0"
-                            height="0"
-                            sizes="100vw"
-                            style={{ width: '200px', height: 'auto' }}
-                            alt="Logo"
-                            priority = {true}
+                {/* Sezione ScrollArea per desktop */}
+                <div className="hidden sm:flex flex-col h-full overflow-hidden">
+                    <ScrollArea className="flex-grow overflow-auto">
+                        <Left
+                            data={data}
+                            activeBuilding={activeBuilding}
+                            setActiveBuilding={setActiveBuilding}
                         />
-                        <Alert className="h-fit text-pretty w-40">
-                            <AlertDescription>
-                                Availability may differ during exam period
-                            </AlertDescription>
-                        </Alert>
-                    </div>
+                    </ScrollArea>
+                </div>
+
+                {/* Sezione normale per mobile */}
+                <div className="sm:hidden flex-grow overflow-auto">
                     <Left
                         data={data}
                         activeBuilding={activeBuilding}
                         setActiveBuilding={setActiveBuilding}
                     />
-                </ScrollArea>
+                </div>
             </div>
             <div className="h-[60vh] basis-3/5 sm:h-screen">
                 <Map
