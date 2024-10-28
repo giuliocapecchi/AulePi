@@ -67,6 +67,7 @@ def get_open_classrooms():
         
     update_calendars() # la funzione controlla se i calendari sono già stati aggiornati per la data odierna. Se non lo sono esegue l'aggiornamento
     buildings_status = unipi_calendar.get_buildings_status(calendari['lessons'])
+    print(buildings_status)
     return jsonify(buildings_status)
 
 
