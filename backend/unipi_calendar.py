@@ -190,6 +190,10 @@ def parse_ics(ics_file):
         location = location_match.group(1) if location_match else "No location"
         location = location.split("-")[0]  # Ottieni solo l'aula
         location = location.replace(" ", "")
+
+        if location == "IngSI5":
+            print("location: ", location, "\n", "description: ", description, "\n", "summary: ", summary, "\n", "dtstart: ", dtstart, "\n", "dtend: ", dtend, "\n")
+            
         
         # Aggiunge l'evento parsato alla lista
         parsed_events.append({
