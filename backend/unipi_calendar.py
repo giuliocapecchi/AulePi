@@ -281,8 +281,8 @@ def get_buildings_status(lessons):
     for lesson in lessons:
         polo = lesson['polo']
         location = lesson['location']
-        start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').astimezone(pisa_timezone)
-        end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').astimezone(pisa_timezone)
+        start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+        end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
 
         # Crea la struttura per il polo se non esiste già
         if polo not in buildings_status:
