@@ -60,7 +60,7 @@ def download_file_from_vercelFS(filename):
             if response.status_code == 200:
                 aule_csv_content = response.content.decode('utf-8')
                 print(f"{filename} caricato in memoria con successo.")
-                print(aule_csv_content)
+                #print(aule_csv_content)
                 return
             else:
                 print(f"Errore nel download di {filename}: {response.status_code}")
@@ -84,7 +84,7 @@ def delete_blob_by_filename(filename):
 
 
 def get_unipi_calendars():
-    global poli_calendar_idsù
+    global poli_calendar_ids
 
     # URL base per ottenere gli impegni, da concatenare con l'id ricevuto
     base_url = "https://unipi.prod.up.cineca.it:443/api/FiltriICal/impegniICal?id="
@@ -239,7 +239,8 @@ def load_calendars_and_parse():
 
 
 def get_buildings_status(lessons):
-    global aule_csv_content, ooli_coordinates
+    global aule_csv_content
+    global poli_coordinates
 
     now = datetime.now(pisa_timezone)
     buildings_status = {}
