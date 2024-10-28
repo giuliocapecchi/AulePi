@@ -17,19 +17,26 @@ export default function Home() {
     const leftRef = useRef<HTMLDivElement>(null); // Riferimento per il componente Left
 
     const handleMarkerClick = (building: string) => {
-        setActiveBuilding(building);
-        scrollToBuilding(building);
+        // If the building is already active, we toggle it off
+        if (activeBuilding === building) {
+            setActiveBuilding(null); // Close the accordion
+        } else {
+            setActiveBuilding(building); // Open the accordion
+            scrollToBuilding(building); // Scroll to the building
+        }
     };
-
+    
     const scrollToBuilding = (building: string) => {
         if (leftRef.current) {
             const element = leftRef.current.querySelector(`[data-building-code="${building}"]`);
             if (element) {
-                const elementPosition = element.getBoundingClientRect().top + window.scrollY; // Ottieni la posizione dell'elemento
-                const offsetPosition = elementPosition- 48; //  
+                const elementPosition = element.getBoundingClientRect().top + window.scrollY; // Position of the element
+                const headerOffset = 48; // Can be adjusted for future needings
+                const offsetPosition = elementPosition - headerOffset; // Scroll position
+                
                 window.scrollTo({
                     top: offsetPosition,
-                    behavior: 'smooth'
+                    behavior: 'smooth',
                 });
             }
         }
