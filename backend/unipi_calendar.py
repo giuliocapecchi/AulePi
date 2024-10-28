@@ -376,7 +376,6 @@ def building_to_csv(buildings_status):
         aule_csv_content = f.getvalue()
         # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
         # quindi non serve la delete del file
-        # TODO : rimuovi commmento
-        #upload_a_blob("aule.csv", aule_csv_content)
+        upload_a_blob("aule.csv", aule_csv_content)
 
     f.close()
