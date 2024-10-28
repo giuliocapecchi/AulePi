@@ -12,6 +12,28 @@ files = {} # Contiene i calendari (scaricati all'avvio del backend)
 aule_csv_content = None # contiene il file 'aule.csv' presente server-side.
 pisa_timezone = ZoneInfo("Europe/Rome") 
 
+poli_calendar_ids = {
+            'poloA': '63247d96e3772a0690e3bcb4',
+            'poloB': '63247e36ac73c806bfa2dfc2',
+            'poloC': '63247e5ee3772a0690e3bd51',
+            'poloPN': '63247c2237746802ea1c1cae',
+            'poloF': '63247ea337746802ea1c1d4b',
+            'poloFibonacci': '63223a029f080a0aab032afc',
+            'poloBenedettine': '63247fadac73c806bfa2e09a',
+            'poloEconomia': '6501c7315640d3007d1012b9',
+            'poloPiagge': '631e682b617f10007c563735'}
+
+poli_coordinates = {
+            'poloA' : [10.389842986424895, 43.72105258709789],
+            'poloB' : [10.389289766627002, 43.72208800629937],
+            'poloC' : [10.38901079266688, 43.72140114553582],
+            'poloF' : [10.388287350482187, 43.72085438583843],
+            'poloPN': [10.391229871075552, 43.72584890979181],
+            'poloFibonacci': [10.408037918667361, 43.720879347333835],
+            'poloBenedettine': [10.39397528101884,43.71344829248517],
+            'poloEconomia': [10.410379473942072, 43.711018978876695],
+            'poloPiagge': [10.412023465973618, 43.710610273943814]}
+
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
 
 def list_all_blobs():
@@ -62,16 +84,12 @@ def delete_blob_by_filename(filename):
 
 
 def get_unipi_calendars():
+    global poli_calendar_idsù
+
     # URL base per ottenere gli impegni, da concatenare con l'id ricevuto
-    
     base_url = "https://unipi.prod.up.cineca.it:443/api/FiltriICal/impegniICal?id="
 
-    poli_calendar_ids = {
-            'poloA': '63247d96e3772a0690e3bcb4',
-            'poloB': '63247e36ac73c806bfa2dfc2',
-            'poloC': '63247e5ee3772a0690e3bd51',
-            'poloPN': '63247c2237746802ea1c1cae',
-            'poloF': '63247ea337746802ea1c1d4b'}
+    
 
     for polo in poli_calendar_ids:
         # Esegui la prima richiesta per ottenere l'ID
@@ -108,7 +126,7 @@ def get_unipi_calendars():
             
             # Crea il link completo concatenando l'ID
             final_url = base_url + id_impegni
-            
+
             # Effettua la chiamata GET al link finale per scaricare il file
             response_impegni = requests.get(final_url, stream=True)
             
@@ -187,12 +205,14 @@ def parse_ics(ics_file):
 
 
 def parse_and_adjust_time(dt):
-    dt = dt[:4] + "-" + dt[4:6] + "-" + dt[6:8] + " " + dt[9:11] + ":" + dt[11:13] + ":" + dt[13:15]
-    # Parsing della stringa in UTC
+    # Trasforma il formato della stringa
+    dt = f"{dt[:4]}-{dt[4:6]}-{dt[6:8]} {dt[9:11]}:{dt[11:13]}:{dt[13:15]}"
+    # Parsing della stringa in datetime con timezone UTC
     dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     # Conversione in ora locale (Europa/Roma)
-    dt = dt.astimezone(ZoneInfo("Europe/Rome"))
+    dt = dt.astimezone(pisa_timezone)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
+
 
 
 
@@ -203,7 +223,7 @@ def load_calendars_and_parse():
     for filename in files:
         # Parsare gli eventi
         lessons = parse_ics(files[filename])
-
+        
         # Aggiungi ad ogni lesson il polo
         polo = filename.split('_')[1]  # Estrai il polo dal nome del file
         for lesson in lessons:
@@ -219,17 +239,11 @@ def load_calendars_and_parse():
 
 
 def get_buildings_status(lessons):
-    global aule_csv_content
+    global aule_csv_content, ooli_coordinates
+
     now = datetime.now(pisa_timezone)
     buildings_status = {}
-    poli_coordinates = {
-            'poloA' : [10.389842986424895, 43.72105258709789],
-            'poloB' : [10.389289766627002, 43.72208800629937],
-            'poloC' : [10.38901079266688, 43.72140114553582],
-            'poloF' : [10.388287350482187, 43.72085438583843],
-            'poloPN': [10.391229871075552, 43.72584890979181]}
     
-
     try:
         f = io.StringIO(aule_csv_content) # Per trattare la stringa come se fosse un file
         reader = csv.reader(f)
@@ -361,6 +375,7 @@ def building_to_csv(buildings_status):
         aule_csv_content = f.getvalue()
         # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
         # quindi non serve la delete del file
-        upload_a_blob("aule.csv", aule_csv_content)
+        # TODO : rimuovi commmento
+        #upload_a_blob("aule.csv", aule_csv_content)
 
     f.close()
