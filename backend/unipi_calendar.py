@@ -188,8 +188,13 @@ def parse_ics(ics_file):
         # Trova la location, se esiste
         location_match = re.search(r'LOCATION:(.*?)\n', event)
         location = location_match.group(1) if location_match else "No location"
-        location = location.split("-")[0]  # Ottieni solo l'aula
-        location = location.replace(" ", "")
+        
+        aula = location.split("-")[0]  # Ottieni solo l'aula
+        polo = location.split("-")[1]  # Ottieni solo il polo
+        aula = aula.replace(" ", "")
+
+        if polo == 'polo B'and aula == 'IngSI7':
+            continue
                 
         # Aggiunge l'evento parsato alla lista
         parsed_events.append({
@@ -197,7 +202,7 @@ def parse_ics(ics_file):
             'start': dtstart,
             'end': dtend,
             'summary': summary,
-            'location': location
+            'location': aula
         })
     
     return parsed_events
@@ -221,11 +226,13 @@ def load_calendars_and_parse():
     all_lessons = []  # Lista per accumulare tutte le lezioni    
     # Itera sui nomi dei file .ics dalla variabile globale
     for filename in files:
+
+        # Ottengo il polo attuale dal filename
+        polo = filename.split('_')[1]  # Estrai il polo dal nome del file
         # Parsare gli eventi
         lessons = parse_ics(files[filename])
         
         # Aggiungi ad ogni lesson il polo
-        polo = filename.split('_')[1]  # Estrai il polo dal nome del file
         for lesson in lessons:
             lesson['polo'] = polo
 
