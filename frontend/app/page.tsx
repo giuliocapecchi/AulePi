@@ -1,35 +1,50 @@
 "use client";
 import Left from "@/components/Left";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react"; // Aggiunto useRef
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Map from "@/components/Map";
 import Loading from "@/components/Loading";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BuildingData } from "@/types/interfaces";
-import { Analytics } from "@vercel/analytics/react" // Import the Analytics component for Vercel Analytics
-
+import { Analytics } from "@vercel/analytics/react"; // Import the Analytics component for Vercel Analytics
 
 export default function Home() {
     const [data, setData] = useState<{ [key: string]: BuildingData }>({});
     const [activeBuilding, setActiveBuilding] = useState<string | null>(null);
     const [userPos, setUserPos] = useState<[number, number] | null>(null);
     const [loading, setLoading] = useState(true);
+    const leftRef = useRef<HTMLDivElement>(null); // Riferimento per il componente Left
 
     const handleMarkerClick = (building: string) => {
         setActiveBuilding(building);
+        scrollToBuilding(building);
+    };
+
+    const scrollToBuilding = (building: string) => {
+        if (leftRef.current) {
+            const element = leftRef.current.querySelector(`[data-building-code="${building}"]`);
+            if (element) {
+                const elementPosition = element.getBoundingClientRect().top + window.scrollY; // Ottieni la posizione dell'elemento
+                const offsetPosition = elementPosition- 48; //  
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        }
     };
 
     useEffect(() => {
         const fetchLocationAndData = async () => {
             setLoading(true);
-    
+
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         const { latitude, longitude } = position.coords;
                         setUserPos([latitude, longitude]);
-    
+
                         try {
                             const res = await fetch("/api/open-classrooms", {
                                 method: "POST",
@@ -48,10 +63,8 @@ export default function Home() {
                                 throw new Error(errorData.error || 'Unknown error occurred');
                             }
 
-                        
-    
                             const fetchedData: { [key: string]: BuildingData } = await res.json();
-                            
+
                             // Set isClosed for each building
                             const updatedData = Object.fromEntries(
                                 Object.entries(fetchedData).map(([buildingCode, buildingData]) => [
@@ -62,7 +75,7 @@ export default function Home() {
                                     },
                                 ])
                             );
-                            
+
                             setData(updatedData);
                         } catch (error) {
                             console.error("Failed to fetch data from backend:", error);
@@ -86,10 +99,10 @@ export default function Home() {
                 setLoading(false);
             }
         };
-    
+
         fetchLocationAndData();
     }, []);
-    
+
     if (loading) {
         return <Loading />;
     }
@@ -97,13 +110,13 @@ export default function Home() {
     return (
         <main className="flex flex-col sm:flex-row sm:gap-4 h-screen">
             <div className="basis-2/5 sm:h-full order-last sm:order-first py-4 sm:px-0 sm:py-2 flex flex-col">
-                <div className="w-full h-20 pl-8 pr-4 hidden sm:flex sm:justify-between items-center">
+                <div className="w-full h-20 pl-8 pr-4 flex justify-between items-center space-x-2">
                     <Image
                         src={"/logo.png"}
                         width="0"
                         height="0"
                         sizes="100vw"
-                        style={{ width: '200px', height: 'auto' }}
+                        style={{ width: 'auto', height: '95%' }}
                         alt="Logo"
                         priority={true}
                         fetchPriority="high"
@@ -115,7 +128,7 @@ export default function Home() {
                     </Alert>
                 </div>
                 {/* Sezione ScrollArea per desktop */}
-                <div className="hidden sm:flex flex-col h-full overflow-hidden">
+                <div className="hidden sm:flex flex-col h-full overflow-hidden" ref={leftRef}>
                     <ScrollArea className="flex-grow overflow-auto">
                         <Left
                             data={data}
@@ -125,8 +138,8 @@ export default function Home() {
                     </ScrollArea>
                 </div>
 
-                {/* Sezione normale per mobile */}
-                <div className="sm:hidden flex-grow overflow-auto">
+                {/* Sezione senza scroll-area per mobile */}
+                <div className="sm:hidden flex-grow overflow-auto" ref={leftRef}>
                     <Left
                         data={data}
                         activeBuilding={activeBuilding}
@@ -144,7 +157,6 @@ export default function Home() {
         </main>
     );
 }
-
 
 function isBuildingClosed(buildingCode: string) {
     const currentHour = new Date().getHours();
@@ -172,13 +184,12 @@ function isBuildingClosed(buildingCode: string) {
         return currentHour < 7 || currentHour >= 20;
     }
 
-
     // polo C da lunedì a venerdì ha come orario 7.30 - 19.39
     if (currentDay >= 1 && currentDay <= 5 && buildingCode === 'poloC') {
         return currentHour < 7 || currentHour >= 19;
     }
 
-    // poloF e poloPN sono aperti sono aperti dalle 8 alle 24 dal lunedì al sabato
+    // poloF e poloPN sono aperti solo dalle 8 alle 24 dal lunedì al sabato
     if (currentDay >= 1 && currentDay <= 6 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
         return currentHour < 8 || currentHour >= 24;
     }

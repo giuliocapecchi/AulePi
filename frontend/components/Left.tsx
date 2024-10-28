@@ -40,7 +40,9 @@ export default function Left({
                 collapsible
                 className="w-full"
                 value={activeBuilding || ""}
-                onValueChange={(val) => setActiveBuilding(val)}
+                onValueChange={(val) => {
+                    setActiveBuilding(val);
+                }}
             >
                 {Object.entries(data)
                     .sort(([, a], [, b]) => {
@@ -62,7 +64,7 @@ export default function Left({
                             disabled={building.isClosed}
                             isClosed={building.isClosed} // Passa la prop isClosed all'AccordionTrigger
                             >
-                                <div className="flex justify-between w-[95%] text-left text-lg group items-center">
+                                <div className="flex justify-between w-[95%] text-left text-lg group items-center" data-building-code={buildingCode} key={buildingCode}>
                                     <div className="group-hover:underline underline-offset-8 pr-2">
                                         Building - {buildingCode.replace("polo", "polo ")} 
                                     </div>
