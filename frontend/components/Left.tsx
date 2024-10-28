@@ -34,7 +34,6 @@ export default function Left({
         data = { InternalServerError: errorData };
     }
     return (
-
         <div className="px-8">
             <Accordion
                 type="single"
@@ -43,7 +42,16 @@ export default function Left({
                 value={activeBuilding || ""}
                 onValueChange={(val) => setActiveBuilding(val)}
             >
-                {Object.entries(data).map(([buildingCode, building]) => {
+                {Object.entries(data)
+                    .sort(([, a], [, b]) => {
+                        // Ordinamento per: free (true) -> free (false) -> isClosed (true)
+                        if (a.free && !b.free) return -1; // a precede b
+                        if (!a.free && b.free) return 1; // b precede a
+                        if (a.isClosed && !b.isClosed) return 1; // b precede a se chiuso
+                        if (!a.isClosed && b.isClosed) return -1; // a precede b se chiuso
+                        return 0; // lasciali invariati se sono uguali
+                    })
+                    .map(([buildingCode, building]) => {
                     return (
                         <AccordionItem
                             id={buildingCode}
@@ -66,11 +74,10 @@ export default function Left({
                                 </div>
                             </AccordionTrigger>
                             <AccordionContent className="divide-y divide-dashed divide-zinc-600">
-                                {Object.entries(building).map(([roomNumber, room]) => {
-                                    if (typeof room === "boolean" || Array.isArray(room)) {
-                                        return null; // Ignora le proprietà non stanza
-                                    }
-                                    return (
+                                {Object.entries(building)
+                                    .filter(([roomNumber, room]) => typeof room !== "boolean" && !Array.isArray(room)) // Filtra solo le stanze
+                                    .sort(([, a], [, b]) => (b.free ? 1 : 0) - (a.free ? 1 : 0)) // Ordina per mettere le stanze libere in cima
+                                    .map(([roomNumber, room]) => (
                                         <div
                                             key={roomNumber}
                                             className="flex justify-between py-2 text-lg font-[family-name:var(--font-geist-mono)] text-[14px]"
@@ -80,7 +87,7 @@ export default function Left({
                                                     {roomNumber}
                                                 </div>
                                                 <div className="relative">
-                                                    {room.lessons && room.lessons.length > 0 ? (
+                                                    {room.free === false ? (
                                                         <div className="h-2 w-2 rounded-full bg-red-400"></div>
                                                     ) : (
                                                         <div className="h-2 w-2 rounded-full bg-green-400"></div>
@@ -88,15 +95,14 @@ export default function Left({
                                                 </div>
                                             </div>
                                             <ul className="text-right">
-                                            {room.lessons?.map((lesson: Lesson, index: number) => (
+                                                {room.lessons?.map((lesson: Lesson, index: number) => (
                                                     <li key={index}>
-                                                        {formatTime(lesson.start)} - {formatTime(lesson.end)} | {lesson.professor} 
+                                                        {formatTime(lesson.start)} - {formatTime(lesson.end)} | {lesson.professor}
                                                     </li>
                                                 ))}
                                             </ul>
                                         </div>
-                                    );
-                                })}
+                                    ))}
                             </AccordionContent>
                         </AccordionItem>
                     );
