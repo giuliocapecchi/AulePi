@@ -136,7 +136,7 @@ export default function Home() {
                         width="0"
                         height="0"
                         sizes="100vw"
-                        style={{ width: 'auto', height: '95%' }}
+                        style={{ width: 'auto', height: '93%' }}
                         alt="Logo"
                         priority={true}
                         fetchPriority="high"
