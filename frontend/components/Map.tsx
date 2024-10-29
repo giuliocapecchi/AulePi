@@ -90,6 +90,15 @@ export default function Map({
             }
         });
 
+         // Define bounds
+         const bounds = new mapboxgl.LngLatBounds(
+            [10.3789,43.7067], // Southwest coordinates [lng, lat]
+            [10.4185,43.7257] // Northeast coordinates [lng, lat]
+        );
+        // Set the map's max bounds.
+        mapRef.current.setMaxBounds(bounds);
+
+
         // Aggiungi i marker sulla mappa
         if (typeof data === 'object' && data !== null) {
             Object.entries(data).forEach(([buildingCode, building]) => {
