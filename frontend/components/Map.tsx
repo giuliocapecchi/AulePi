@@ -147,7 +147,7 @@ export default function Map({
                 mapRef.current.remove();
             }
         };
-    }, [data, userPos, center, zoom, mapboxToken]);
+    }, [mapboxToken]);
 
     return (
         <div className="h-[60vh] sm:w-full sm:h-full relative bg-red-500/0 rounded-[20px] p-2 sm:p-0">
