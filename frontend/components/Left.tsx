@@ -139,27 +139,27 @@ export default function Left({
 
                         <div>
                             <h2 className="text-lg md:text-2xl font-semibold">About this Project</h2>
-                            <p className="text-sm md:text-base leading-relaxed">Welcome to AulePi, a website where you can find available classes for all the University of Pisa buildings! The platform is designed to provide students with quick information on classroom availability. Whether you're looking for a quiet place to study or a classroom for your next lecture, AulePi has you covered.</p>
+                            <p className="text-sm md:text-base leading-relaxed">Welcome to AulePi, a website where you can find available classes for all the University of Pisa buildings! The platform is designed to provide students with quick information on classroom availability. Whether you are looking for a quiet place to study or a classroom for your next lecture, AulePi has you covered.</p>
                         </div>
 
                         <div>
                             <h2 className="text-lg md:text-2xl font-semibold">Features</h2>
-                            <p className="text-sm md:text-base leading-relaxed">The application tries to be user-friendly and straightforward. One hidden feature is although present: you can click on the building's markers on the map, and this will redirect you to their current time schedule.</p>
+                            <p className="text-sm md:text-base leading-relaxed">The application tries to be user-friendly and straightforward. One hidden feature is although present: you can click on the building&apos;s markers on the map, and this will redirect you to their current time schedule.</p>
                         </div>
 
                         <div>
                             <h2 className="text-lg md:text-2xl font-semibold">How does this work?</h2>
-                            <p className="text-sm md:text-base leading-relaxed">AulePi aggregates data from the University of Pisa's scheduling systems, ensuring that you receive accurate and up-to-date information each time you load the page: if you encounter outdated information, simply refresh the page to retrieve the latest updates. For more in-depth details, check out the <a href="https://github.com/giuliocapecchi/AulePi" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">GitHub repository</a> for this project.</p>
+                            <p className="text-sm md:text-base leading-relaxed">AulePi aggregates data from the University of Pisa&apos;s scheduling systems, ensuring that you receive accurate and up-to-date information each time you load the page: if you encounter outdated information, simply refresh the page to retrieve the latest updates. For more in-depth details, check out the <a href="https://github.com/giuliocapecchi/AulePi" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">GitHub repository</a> for this project.</p>
                         </div>
 
                         <div>
                             <h2 className="text-lg md:text-2xl font-semibold">Who Am I</h2>
-                            <p className="text-sm md:text-base leading-relaxed">I am <a href="https://www.linkedin.com/in/giulio-capecchi/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Giulio Capecchi</a>, a student currently enrolled in the Master's program (AIDE) at the University of Pisa. With AulePi, my aim was to create a valuable resource for my fellow students, facilitating the search for available classrooms. I hope you find this website helpful in your studies! If you have any feedback or suggestions, feel free to reach out to me on <a href="https://github.com/giuliocapecchi" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">GitHub</a> or via <a href="mailto:giuliocapecchi2000@gmail.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">email</a>.</p>
+                            <p className="text-sm md:text-base leading-relaxed">I am <a href="https://www.linkedin.com/in/giulio-capecchi/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Giulio Capecchi</a>, a student currently enrolled in the Master&apos;s program (AIDE) at the University of Pisa. With AulePi, my aim was to create a valuable resource for my fellow students, facilitating the search for available classrooms. I hope you find this website helpful in your studies! If you have any feedback or suggestions, feel free to reach out to me on <a href="https://github.com/giuliocapecchi" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">GitHub</a> or via <a href="mailto:giuliocapecchi2000@gmail.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">email</a>.</p>
                         </div>
                         <div>
                             <h2 className="text-lg md:text-2xl font-semibold">Disclaimer</h2>
                             <p className="text-sm md:text-base leading-relaxed">
-                                Please note that while AulePi strives to provide accurate and up-to-date information, the information provided may change without notice. AulePi's mainteners shall not be held liable for any discrepancies or issues arising from the use of this application.
+                                Please note that while AulePi strives to provide accurate and up-to-date information, the information provided may change without notice. AulePi&apos;s mainteners shall not be held liable for any discrepancies or issues arising from the use of this application.
                             </p>
                         </div>
 
