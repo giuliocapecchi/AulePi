@@ -26,7 +26,10 @@ poli_calendar_ids = {
             'poloCarmignani': '63247758e3772a0690e3b9f3',
             'poloGuidotti': '64ff310b0c7dac007d24cdc3',
             'poloNobili': '64ff316f3f77cd0078076002',
-            'poloP.Ricci': '64ff2e89dd600900782c3cc3'
+            'poloP.Ricci': '64ff2e89dd600900782c3cc3',
+            'poloP.Boileau': '6501c860675557007eb417c0',
+            'poloS.Rossore': '63247d5f75616d04046a0779',
+            'poloSapienza' : '63247af9ac73c806bfa2def2',
             }
 
 poli_coordinates = {
@@ -42,7 +45,10 @@ poli_coordinates = {
             'poloCarmignani': [10.40094950738802, 43.72011831490275],
             'poloGuidotti': [10.392386095658338, 43.71741398544361],
             'poloNobili': [10.395924531247118, 43.71849818636451],
-            'poloP.Ricci': [10.396921563725783, 43.717686512092854]
+            'poloP.Ricci': [10.396921563725783, 43.717686512092854],
+            'poloP.Boileau' : [10.397074275993532, 43.71998968935904],
+            'poloS.Rossore': [10.392641884389207, 43.717998675187204],
+            'poloSapienza' : [10.399496403929106, 43.717311583201365]
             }
 
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
@@ -223,6 +229,7 @@ def parse_aule_csv(content):
     Costruisce la variabile globale `buildings_status` a partire dal contenuto del file 'aule.csv' scaricato da VercelFS.
     """
     global buildings_status
+    global poli_coordinates
 
     f = io.StringIO(content) # Per trattare la stringa come se fosse un file
     reader = csv.reader(f)
@@ -260,6 +267,14 @@ def parse_and_adjust_time(dt):
 
 def load_calendars_and_parse():
     global aule_csv_content
+    global poli_calendar_ids
+    global poli_coordinates
+
+    # se poli_calendar_ids non ha lo stesso numero di elementi di poli_coordinates, esce
+    if len(poli_calendar_ids) != len(poli_coordinates):
+        print("Errore: poli_calendar_ids e poli_coordinates non hanno lo stesso numero di elementi.")
+        return
+
     get_unipi_calendars()
     all_lessons = []  # Lista per accumulare tutte le lezioni    
     # Itera sui nomi dei file .ics dalla variabile globale
