@@ -19,15 +19,14 @@ export default function Map({
     const isUserInPisa = (position: [number, number]): boolean => {
         const [latitude, longitude] = position;
 
-        // Definisci i confini di Pisa (latitudine, longitudine)
+        // Confini di Pisa
         const pisaBounds = {
-            north: 43.7366, // Limite nord
-            south: 43.7072, // Limite sud
-            east: 10.4271,  // Limite est
-            west: 10.3643,  // Limite ovest
+            north: 43.7366,
+            south: 43.7072,
+            east: 10.4271,
+            west: 10.3643,
         };
 
-        // Verifica se la posizione dell'utente è all'interno dei confini
         return (
             latitude >= pisaBounds.south &&
             latitude <= pisaBounds.north &&
@@ -36,28 +35,29 @@ export default function Map({
         );
     };
 
-    const [center, setCenter] = useState<[number, number]>(
-        userPos && isUserInPisa(userPos) 
-            ? [userPos[1], userPos[0]]
-            : window.innerWidth < 768
-                ? [10.390978, 43.718735] // Centro per i dispositivi mobili
-                : [10.395310, 43.716592] // Centro per i dispositivi desktop
-    );
+    // Calcolo iniziale del centro mappa
+    const initialCenter: [number, number] = userPos && isUserInPisa(userPos)
+        ? [userPos[1], userPos[0]]
+        : window.innerWidth < 768
+            ? [10.391578, 43.718735] // Centro per dispositivi mobili
+            : [10.395310, 43.716592]; // Centro per dispositivi desktop
 
-    const [zoom, setZoom] = window.innerWidth < 768
-        ? useState(16.0) // Zoom per telefoni
-        : useState(16) // Zoom per pc
+    const [center, setCenter] = useState<[number, number]>(initialCenter);
+    
+    // Imposta lo stato di zoom in base alla larghezza della finestra
+    const [zoom, setZoom] = useState(window.innerWidth < 768 ? 16.0 : 16);
     const [pitch, setPitch] = useState(69.97);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
+    // Funzione per ottenere il colore in base allo stato
     function getColorByStatus(free: boolean, isClosed: boolean, buildingAvailableSoon: boolean) {
         if (free && !isClosed) {
-                return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
-        }else if(buildingAvailableSoon && !isClosed){
-                return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px_rgba(255,165,0,0.7)]";
-        }else{
-                return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+            return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
+        } else if (buildingAvailableSoon && !isClosed) {
+            return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px rgba(255,165,0,0.7)]";
+        } else {
+            return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px rgba(239,68,68,0.9)]";
         }
     }
 
@@ -76,6 +76,8 @@ export default function Map({
             zoom: zoom,
             pitch: pitch,
         });
+
+        // Gestisce il movimento della mappa
         mapRef.current.on("move", () => {
             if (mapRef.current) {
                 const mapCenter = mapRef.current.getCenter();
@@ -87,24 +89,24 @@ export default function Map({
                 setPitch(mapPitch);
             }
         });
+
+        // Aggiungi i marker sulla mappa
         if (typeof data === 'object' && data !== null) {
             Object.entries(data).forEach(([buildingCode, building]) => {
                 const el = document.createElement("div");
-                el.className = "relative"; // Use relative positioning for the marker
+                el.className = "relative";
 
-                // Create the marker circle
                 const markerCircle = document.createElement("div");
                 markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean, building.buildingAvailableSoon as boolean);
                 el.appendChild(markerCircle);
 
-                // Create the label
                 const label = document.createElement("div");
-                label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded"; // Adjusted styles
-                label.innerText = buildingCode.replace("polo", "Polo "); // Adjust the label text as needed
+                label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded";
+                label.innerText = buildingCode.replace("polo", "Polo ");
                 el.appendChild(label);
 
                 el.addEventListener("click", () => {
-                    if(!building.isClosed){
+                    if (!building.isClosed) {
                         const accordionItem = document.getElementById(buildingCode);
                         setTimeout(() => {
                             if (accordionItem) {
@@ -128,10 +130,12 @@ export default function Map({
             console.error("Data is not an object:", data);
         }
         console.log("Markers added to the map");
+
+        // Aggiungi il marker per la posizione dell'utente
         if (userPos) {
             const e2 = document.createElement("div");
             e2.className =
-                "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px_rgba(14,165,233,1)]";
+                "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
 
             new mapboxgl.Marker(e2)
                 .setLngLat([userPos[1], userPos[0]])
@@ -143,7 +147,7 @@ export default function Map({
                 mapRef.current.remove();
             }
         };
-    }, [data, userPos]);
+    }, [data, userPos, center, zoom, mapboxToken]);
 
     return (
         <div className="h-[60vh] sm:w-full sm:h-full relative bg-red-500/0 rounded-[20px] p-2 sm:p-0">
