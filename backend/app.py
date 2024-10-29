@@ -43,32 +43,42 @@ def test():
     return jsonify({"message": "Test route is working!"})
 
 
-@app.route('/api/open-classrooms', methods=['GET', 'POST'])
+@app.route('/api/open-classrooms', methods=['GET'])
 def get_open_classrooms():
+    
+    print("GET method invoked")    
+
+    update_calendars() # la funzione controlla se i calendari sono già stati aggiornati per la data odierna. Se non lo sono esegue l'aggiornamento
+    buildings_status = unipi_calendar.get_buildings_status()
+    response = jsonify(buildings_status)
+    
+    payload_size = len(response.get_data()) / (1024) 
+    print("Dim. della risposta:", payload_size)
+
+    
+
+    return response
+
+
+@app.route('/api/open-classrooms', methods=['POST'])
+def post_open_classrooms():
+
+    print("Method post")
     user_lat = 0
     user_lng = 0
+    user_location = request.get_json()
 
-   
-    if request.method == 'GET':
-        print("get method")
+    if user_location is None:
+        return jsonify({"error": "No data provided"}), 400
 
-    if request.method == 'POST':
-        print("Method post")
-        user_location = request.get_json()
+    user_lat = user_location.get('lat')
+    user_lng = user_location.get('lng')
 
-        if user_location is None:
-            return jsonify({"error": "No data provided"}), 400
-
-        user_lat = user_location.get('lat')
-        user_lng = user_location.get('lng')
-
-        if user_lat is None or user_lng is None:
-            return jsonify({"error": "Invalid location data. 'lat' and 'lng' are required."}), 400
-        
-    update_calendars() # la funzione controlla se i calendari sono già stati aggiornati per la data odierna. Se non lo sono esegue l'aggiornamento
-    buildings_status = unipi_calendar.get_buildings_status(calendari['lessons'])
-    return jsonify(buildings_status)
-
+    if user_lat is None or user_lng is None:
+        return jsonify({"error": "Invalid location data. 'lat' and 'lng' are required."}), 400
+    
+    # TODO : missing implementation (get the closest open classrooms)
+    
 
 
 if __name__ == '__main__':

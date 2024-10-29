@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 
 files = {} # Contiene i calendari (scaricati all'avvio del backend)
-aule_csv_content = None # contiene il file 'aule.csv' presente server-side.
+buildings_status =  {} # contiene lo stato degli edifici (aggiornato ogni volta che si chiama la funzione get_open_classrooms)
 pisa_timezone = ZoneInfo("Europe/Rome") 
 
 poli_calendar_ids = {
@@ -21,7 +21,12 @@ poli_calendar_ids = {
             'poloFibonacci': '63223a029f080a0aab032afc',
             'poloBenedettine': '63247fadac73c806bfa2e09a',
             'poloEconomia': '6501c7315640d3007d1012b9',
-            'poloPiagge': '631e682b617f10007c563735'}
+            'poloPiagge': '631e682b617f10007c563735',
+            'poloCarmignani': '63247758e3772a0690e3b9f3',
+            'poloGuidotti': '64ff310b0c7dac007d24cdc3',
+            'poloNobili': '64ff316f3f77cd0078076002',
+            'poloPalazzoRicci': '64ff2e89dd600900782c3cc3'
+            }
 
 poli_coordinates = {
             'poloA' : [10.389842986424895, 43.72105258709789],
@@ -32,7 +37,12 @@ poli_coordinates = {
             'poloFibonacci': [10.408037918667361, 43.720879347333835],
             'poloBenedettine': [10.39397528101884,43.71344829248517],
             'poloEconomia': [10.410379473942072, 43.711018978876695],
-            'poloPiagge': [10.412023465973618, 43.710610273943814]}
+            'poloPiagge': [10.412023465973618, 43.710610273943814],
+            'poloCarmignani': [10.40094950738802, 43.72011831490275],
+            'poloGuidotti': [10.392386095658338, 43.71741398544361],
+            'poloNobili': [10.395924531247118, 43.71849818636451],
+            'poloPalazzoRicci': [10396921563725783, 43.717686512092854]
+            }
 
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
 
@@ -52,20 +62,20 @@ def upload_a_blob(file_name, file_content):
 
 
 def download_file_from_vercelFS(filename):
-    global aule_csv_content
     blobs = list_all_blobs()
     for blob in blobs['blobs']:
         if blob['pathname'] == filename:
             response = requests.get(blob['url'])
             if response.status_code == 200:
-                aule_csv_content = response.content.decode('utf-8')
+                content = response.content.decode('utf-8')
                 print(f"{filename} caricato in memoria con successo.")
-                #print(aule_csv_content)
-                return
+                #print(content)
+                if content != None and content != "":
+                    return content
             else:
                 print(f"Errore nel download di {filename}: {response.status_code}")
                 return
-    print(f"{filename} non trovato nei blob.")
+    print(f"File {filename} non trovato su VercelFS.")
 
 
 def delete_blob_by_filename(filename):
@@ -193,7 +203,7 @@ def parse_ics(ics_file):
         polo = location.split("-")[1]  # Ottieni solo il polo
         aula = aula.replace(" ", "")
 
-        if polo == 'polo B'and aula == 'IngSI7':
+        if polo == 'polo B' and aula == 'IngSI7':
             continue
                 
         # Aggiunge l'evento parsato alla lista
@@ -201,11 +211,39 @@ def parse_ics(ics_file):
             'professor': description,
             'start': dtstart,
             'end': dtend,
-            'summary': summary,
             'location': aula
         })
     
     return parsed_events
+
+
+def parse_aule_csv(content):
+    """
+    Costruisce la variabile globale `buildings_status` a partire dal contenuto del file 'aule.csv' scaricato da VercelFS.
+    """
+    global buildings_status
+
+    f = io.StringIO(content) # Per trattare la stringa come se fosse un file
+    reader = csv.reader(f)
+    next(reader)  # Salta l'intestazione
+    for row in reader:
+        polo = row[0]
+        location = row[1]
+        free = row[2] == True
+        if polo not in buildings_status:
+            buildings_status[polo] = {}
+            # aggiungi le coordinate del polo
+            buildings_status[polo]['coordinates'] = poli_coordinates[polo]
+            # aggiungi la chiave 'free' e 'availableSoon' per il polo
+            buildings_status[polo]['free'] = False
+            buildings_status[polo]['buildingAvailableSoon'] = False
+            # Crea la struttura per l'aula nel polo se non esiste già 
+            if location not in buildings_status[polo]:
+                buildings_status[polo][location] = {
+                    'lessons': [],
+                    'free': free
+                    }
+    f.close()
 
 
 
@@ -217,8 +255,6 @@ def parse_and_adjust_time(dt):
     # Conversione in ora locale (Europa/Roma)
     dt = dt.astimezone(pisa_timezone)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-
 
 
 def load_calendars_and_parse():
@@ -240,45 +276,25 @@ def load_calendars_and_parse():
         all_lessons.extend(lessons)
     print("Calendari caricati con successo.")
     load_dotenv()
-    download_file_from_vercelFS("aule.csv")
-    building_to_csv(get_buildings_status(all_lessons)) # Aggiungi i poli aggiornati al csv lato VercelFS    
+    aule_csv_content = download_file_from_vercelFS("aule.csv")
+    if aule_csv_content != None and aule_csv_content != "":
+        parse_aule_csv(aule_csv_content)
+            
+    initialize_buildings_status(all_lessons)
+    #building_to_csv(buildings_status)
+    
     return all_lessons  # Restituisci tutte le lezioni accumulate
 
 
-def get_buildings_status(lessons):
-    global aule_csv_content
+def initialize_buildings_status(lessons):
+    """
+    Aggiorna la variabile globale `buildings_status` con lo stato attuale degli edifici.
+    """
     global poli_coordinates
+    global buildings_status
+
 
     now = datetime.now(pisa_timezone)
-    buildings_status = {}
-    
-    try:
-        f = io.StringIO(aule_csv_content) # Per trattare la stringa come se fosse un file
-        reader = csv.reader(f)
-        next(reader)  # Salta l'intestazione
-        for row in reader:
-            polo = row[0]
-            location = row[1]
-            free = row[2] == 'True'
-            if polo not in buildings_status:
-                buildings_status[polo] = {}
-                buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            if location not in buildings_status[polo]:
-                buildings_status[polo][location] = {
-                    'lessons': [],
-                    'free': free
-                    }
-        f.close()
-
-    except:
-        print("File 'aule.csv' non trovato su VercelFS, verrà creato e caricato.")
-        f = io.StringIO() # Usiamo io per trattare la stringa come se fosse un file
-        writer = csv.writer(f)
-        writer.writerow(["polo", "aula", "usually_open"])
-        aule_csv_content = f.getvalue()
-        upload_a_blob("aule.csv", aule_csv_content)
-        f.close()
-    
     
     # Itera su tutte le lezioni
     for lesson in lessons:
@@ -292,50 +308,116 @@ def get_buildings_status(lessons):
             buildings_status[polo] = {}
             # aggiungi le coordinate del polo
             buildings_status[polo]['coordinates'] = poli_coordinates[polo]
+            buildings_status[polo]['buildingAvailableSoon'] = False
 
+            
         # Crea la struttura per l'aula se non esiste già
         if location not in buildings_status[polo]:
             buildings_status[polo][location] = {
                 'lessons': [],  # Lezioni future o in corso
-                'free': True    # Presume l'aula libera fino a prova contraria
+                'free': True,    # Presume l'aula libera fino a prova contraria
+                'roomAvailableSoon': False  # Presume l'aula non disponibile a breve fino a prova contraria
             }
-
+        
         # Confronta l'orario per selezionare lezioni future o in corso oggi
         if start_time.date() == now.date() and end_time > now:
-            # rimuovi tutte le '\' da 'lesson['professor'] e da 'lesson['summary']'
+            # rimuovi tutte le '\' da 'lesson['professor']
             lesson['professor'] = lesson['professor'].replace("\\", "")
-            lesson['summary'] = lesson['summary'].replace("\\", "")
             # rimuovi '\nNOTE:'
             lesson['professor'] = lesson['professor'].split("\nNOTE:")[0]
             buildings_status[polo][location]['lessons'].append({
                 'professor': lesson['professor'],
                 'start': start_time.strftime('%Y-%m-%d %H:%M:%S'),
                 'end': end_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'summary': lesson['summary']
             })
             
             # Se c'è una lezione in corso al momento, l'aula non è libera
             if start_time <= now <= end_time:
                 buildings_status[polo][location]['free'] = False
 
+            # Se la lezione finisce entro 30 minuti, setto il campo 'availableSoon' a True. Come ne trovo una significa che anche il polo è disponibile a breve
+            if end_time - now <= timedelta(minutes=30):
+                buildings_status[polo][location]['roomAvailableSoon'] = True
+                buildings_status[polo]['buildingAvailableSoon'] = True
     
     # Se il polo ha almeno una aula liberata, il polo è considerato libero
     for polo in buildings_status:
-    # Imposta inizialmente il polo come non libero
-        buildings_status[polo]['free'] = False
-
+        # Imposta inizialmente il polo come non libero e non disponibile a breve
+        is_building_free = False
+        
         # Se il polo ha almeno una aula liberata, il polo è considerato libero
-        if any(buildings_status[polo][location]['free'] 
-           for location in buildings_status[polo] 
-           if location not in ['coordinates', 'free']):  # Escludi le chiavi 'coordinates' e 'free'
-            buildings_status[polo]['free'] = True
+        for location in buildings_status[polo]:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+                if buildings_status[polo][location]['free'] == True:
+                    is_building_free = True
+                    break
+        
+        buildings_status[polo]['free'] = is_building_free
 
     return buildings_status
 
+def get_buildings_status():
+    """
+    Aggiorna e restituisce lo stato attuale degli edifici.
+    """
+    global buildings_status
 
+    # scorre building_status e rimuove le lezioni che sono terminate. Setta:
+    # - il campo free della location a True se non ci sono lezioni in corso in questo momento
+    # - il campo free del polo a True se c'è almeno una location libera
+    # - il campo roomAvailableSoon della location a True se la location sarà libera entro 30 minuti
+    # - il campo buildingAvailableSoon del polo a True se c'è almeno una location che sarà libera entro 30 minuti
+    now = datetime.now(pisa_timezone)
+    # aggiungi un'ora a now per debug
+    now = now + timedelta(hours=1)
+    for polo in buildings_status:
+        for location in buildings_status[polo]:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+                # Rimuovi le lezioni terminate
+                buildings_status[polo][location]['lessons'] = [lesson for lesson in buildings_status[polo][location]['lessons']
+                                                               if datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now]
+                
+                # Imposta inizialmente l'aula come libera
+                buildings_status[polo][location]['free'] = True
+                buildings_status[polo][location]['roomAvailableSoon'] = False
+
+                # Se l'aula ha almeno una lezione in corso, non è libera
+                for lesson in buildings_status[polo][location]['lessons']:
+                    start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                    end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                    # Controlla se la lezione è in corso
+                    if start_time <= now <= end_time:
+                        buildings_status[polo][location]['free'] = False
+
+                        # Verifica se la lezione finisce entro 30 minuti
+                        if end_time - now <= timedelta(minutes=30):
+                            # Controlla se c'è un'altra lezione che inizia esattamente quando termina la lezione corrente
+                            next_lesson_exists = any(
+                                datetime.strptime(next_lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) == end_time
+                                for next_lesson in buildings_status[polo][location]['lessons']
+                            )
+
+                            # Se non c'è un'altra lezione che inizia quando termina l'attuale, setta 'availableSoon' a True
+                            if not next_lesson_exists:
+                                buildings_status[polo][location]['roomAvailableSoon'] = True
+                                buildings_status[polo]['buildingAvailableSoon'] = True
+
+        # Se il polo ha almeno una aula liberata, il polo è considerato libero
+        is_building_free = False
+        for location in buildings_status[polo]:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+                if buildings_status[polo][location]['free'] == True:
+                    is_building_free = True
+                    break
+        buildings_status[polo]['free'] = is_building_free
+    
+    return buildings_status
 
 def building_to_csv(buildings_status):
-    global aule_csv_content
+    """
+    Aggiorna il file 'aule.csv' su VercelFS con le aule libere e occupate.
+    Viene chiamata una volta in fase di avvio del backend, dopo aver caricato i calendari.
+    """
     aule_esistenti = set()
     changes = False
 
