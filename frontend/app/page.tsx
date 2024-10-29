@@ -161,33 +161,61 @@ function isBuildingClosed(buildingCode: string) {
     if (currentDay === 0 && !(buildingCode === 'poloF' || buildingCode === 'poloPN')) {
         return true;
     } else if (currentDay === 0 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
-        return currentHour < 8 || currentHour >= 24;
+        return currentHour < 8.5 || currentHour >= 24;
     }
 
     // sabato poloA e poloB hanno come orario 7.30 - 14
     if (currentDay === 6 && (buildingCode === 'poloA' || buildingCode === 'poloB')) {
-        return currentHour < 7 || currentHour >= 14;
+        return currentHour < 7.5 || currentHour >= 14;
     }
 
-    // il poloC di sabato ha come orario 8 - 13
-    if (currentDay === 6 && buildingCode === 'poloC') {
+    // il poloC e il poloEconomia di sabato hanno come orario 8 - 13
+    if (currentDay === 6 && (buildingCode === 'poloC' || buildingCode === 'poloEconomia')) {
         return currentHour < 8 || currentHour >= 13;
     }
 
     // poloA e poloB da lunedì a venerdì hanno come orario 7.30 - 20
     if (currentDay >= 1 && currentDay <= 5 && (buildingCode === 'poloA' || buildingCode === 'poloB')) {
-        return currentHour < 7 || currentHour >= 20;
+        return currentHour < 7.5 || currentHour >= 20;
     }
 
-    // polo C da lunedì a venerdì ha come orario 7.30 - 19.39
+    // polo C da lunedì a venerdì ha come orario 7.30 - 19.30
     if (currentDay >= 1 && currentDay <= 5 && buildingCode === 'poloC') {
-        return currentHour < 7 || currentHour >= 19;
+        return currentHour < 7.5 || currentHour >= 19.5;
     }
 
     // poloF e poloPN sono aperti solo dalle 8 alle 24 dal lunedì al sabato
     if (currentDay >= 1 && currentDay <= 6 && (buildingCode === 'poloF' || buildingCode === 'poloPN')) {
         return currentHour < 8 || currentHour >= 24;
     }
+
+    // poloFibonacci è aperto solo dalle 8 alle 19 dal lunedì al venerdì
+    if (currentDay >= 1 && currentDay <= 5 && buildingCode === 'poloFibonacci') {
+        return currentHour < 8 || currentHour >= 19;
+    } 
+
+    // poloBenedettine e poloEconomia sono aperti dalle 8 alle 19:30 tranne sabato e domenica
+    if (currentDay >= 1 && currentDay <= 5 && (buildingCode === 'poloBenedettine' || buildingCode === 'poloEconomia')) {
+        return currentHour < 8 || currentHour >= 19.5;
+    }
+
+    // poloBenedettine è aperto dalle 8:30 alle 14 il sabato
+    if (currentDay === 6 && buildingCode === 'poloBenedettine') {
+        return currentHour < 8.5 || currentHour >= 14;
+    }
+
+    // poloPiagge aperto dalle 8 alle 24 dal lunedì al venerdì
+    if (currentDay >= 1 && currentDay <= 5 && buildingCode === 'poloPiagge') {
+        return currentHour < 8 || currentHour >= 24;
+    }
+
+    // poloCarmignani aperto dalle 8 alle 19:30 dal lunedì al venerdì
+    if (currentDay >= 1 && currentDay <= 5 && (buildingCode === 'poloCarmignani' || buildingCode === 'poloGuidotti' || buildingCode === 'poloNobili' || buildingCode === 'poloP.Ricci' || buildingCode === 'poloP.Boileau' || buildingCode ==='poloS.Rossore' || buildingCode === 'poloSapienza') ) {
+        return currentHour < 8 || currentHour >= 19.5;
+    }
+
+
+
 
     return false;
 }
