@@ -368,8 +368,6 @@ def get_buildings_status():
     # - il campo roomAvailableSoon della location a True se la location sarà libera entro 30 minuti
     # - il campo buildingAvailableSoon del polo a True se c'è almeno una location che sarà libera entro 30 minuti
     now = datetime.now(pisa_timezone)
-    # aggiungi un'ora a now per debug
-    now = now + timedelta(hours=1)
     for polo in buildings_status:
         for location in buildings_status[polo]:
             if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
