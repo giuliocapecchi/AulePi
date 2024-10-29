@@ -52,11 +52,9 @@ def get_open_classrooms():
     buildings_status = unipi_calendar.get_buildings_status()
     response = jsonify(buildings_status)
     
-    payload_size = len(response.get_data()) / (1024) 
-    print("Dim. della risposta:", payload_size)
-
+    # payload_size = len(response.get_data()) / (1024) 
+    # print("Dim. della risposta:", payload_size)
     
-
     return response
 
 

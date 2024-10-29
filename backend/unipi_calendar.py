@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 
 files = {} # Contiene i calendari (scaricati all'avvio del backend)
+aule_csv_content = None # Contiene il contenuto del file 'aule.csv' scaricato da VercelFS
 buildings_status =  {} # contiene lo stato degli edifici (aggiornato ogni volta che si chiama la funzione get_open_classrooms)
 pisa_timezone = ZoneInfo("Europe/Rome") 
 
@@ -25,7 +26,7 @@ poli_calendar_ids = {
             'poloCarmignani': '63247758e3772a0690e3b9f3',
             'poloGuidotti': '64ff310b0c7dac007d24cdc3',
             'poloNobili': '64ff316f3f77cd0078076002',
-            'poloPalazzoRicci': '64ff2e89dd600900782c3cc3'
+            'poloP.Ricci': '64ff2e89dd600900782c3cc3'
             }
 
 poli_coordinates = {
@@ -41,7 +42,7 @@ poli_coordinates = {
             'poloCarmignani': [10.40094950738802, 43.72011831490275],
             'poloGuidotti': [10.392386095658338, 43.71741398544361],
             'poloNobili': [10.395924531247118, 43.71849818636451],
-            'poloPalazzoRicci': [10.396921563725783, 43.717686512092854]
+            'poloP.Ricci': [10.396921563725783, 43.717686512092854]
             }
 
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
@@ -258,6 +259,7 @@ def parse_and_adjust_time(dt):
 
 
 def load_calendars_and_parse():
+    global aule_csv_content
     get_unipi_calendars()
     all_lessons = []  # Lista per accumulare tutte le lezioni    
     # Itera sui nomi dei file .ics dalla variabile globale
@@ -361,8 +363,7 @@ def get_buildings_status():
     Aggiorna e restituisce lo stato attuale degli edifici.
     """
     global buildings_status
-
-    # scorre building_status e rimuove le lezioni che sono terminate. Setta:
+    # scorre buildings_status e rimuove le lezioni che sono terminate. Setta:
     # - il campo free della location a True se non ci sono lezioni in corso in questo momento
     # - il campo free del polo a True se c'è almeno una location libera
     # - il campo roomAvailableSoon della location a True se la location sarà libera entro 30 minuti
@@ -390,32 +391,42 @@ def get_buildings_status():
                         # Verifica se la lezione finisce entro 30 minuti
                         if end_time - now <= timedelta(minutes=30):
                             # Controlla se c'è un'altra lezione che inizia esattamente quando termina la lezione corrente
+                            # oppure se inizia 15 minuti dopo la fine della lezione corrente
                             next_lesson_exists = any(
-                                datetime.strptime(next_lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) == end_time
+                                datetime.strptime(next_lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) in {end_time, end_time + timedelta(minutes=15)}
                                 for next_lesson in buildings_status[polo][location]['lessons']
-                            )
+                                )
 
                             # Se non c'è un'altra lezione che inizia quando termina l'attuale, setta 'availableSoon' a True
                             if not next_lesson_exists:
                                 buildings_status[polo][location]['roomAvailableSoon'] = True
-                                buildings_status[polo]['buildingAvailableSoon'] = True
+        
 
         # Se il polo ha almeno una aula liberata, il polo è considerato libero
-        is_building_free = False
+        buildings_status[polo]['free'] = False
         for location in buildings_status[polo]:
             if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
                 if buildings_status[polo][location]['free'] == True:
-                    is_building_free = True
+                    buildings_status[polo]['free'] = True
                     break
-        buildings_status[polo]['free'] = is_building_free
+    
+        # se il polo ha almeno una aula che sarà libera entro 30 minuti, il polo è considerato disponibile a breve
+        buildings_status[polo]['buildingAvailableSoon'] = False
+        for location in buildings_status[polo]:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+                if buildings_status[polo][location]['roomAvailableSoon'] == True:
+                    buildings_status[polo]['buildingAvailableSoon'] = True
+                    break
     
     return buildings_status
+
 
 def building_to_csv(buildings_status):
     """
     Aggiorna il file 'aule.csv' su VercelFS con le aule libere e occupate.
     Viene chiamata una volta in fase di avvio del backend, dopo aver caricato i calendari.
     """
+    global aule_csv_content
     aule_esistenti = set()
     changes = False
 
@@ -453,8 +464,9 @@ def building_to_csv(buildings_status):
                 aula = (polo, location)
                 # Controlla se l'aula è già presente
                 if aula not in aule_esistenti:
-                    writer.writerow([polo, location, buildings_status[polo][location]['free']])
+                    writer.writerow([polo, location, 'True'])
                     aule_esistenti.add(aula)  # Aggiungi l'aula al set per evitare duplicati
+                    print("Aggiunto un'aula: ", aula)
                     changes = True  # Imposta il flag su True perché c'è una modifica
 
     # Se ci sono state modifiche, aggiorna `aule_csv_content` e aggiorna il file server-side

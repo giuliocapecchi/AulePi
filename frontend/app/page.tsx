@@ -15,6 +15,7 @@ export default function Home() {
     const [userPos, setUserPos] = useState<[number, number] | null>(null);
     const [loading, setLoading] = useState(true);
     const leftRef = useRef<HTMLDivElement>(null); // Riferimento per il componente Left
+    const hasFetched = useRef(false);
 
     const handleMarkerClick = (building: string) => {
         // If the building is already active, we toggle it off
@@ -25,7 +26,7 @@ export default function Home() {
             scrollToBuilding(building); // Scroll to the building
         }
     };
-    
+
     const scrollToBuilding = (building: string) => {
         if (leftRef.current) {
             const element = leftRef.current.querySelector(`[data-building-code="${building}"]`);
@@ -33,7 +34,7 @@ export default function Home() {
                 const elementPosition = element.getBoundingClientRect().top + window.scrollY; // Position of the element
                 const headerOffset = 48; // Can be adjusted for future needings
                 const offsetPosition = elementPosition - headerOffset; // Scroll position
-                
+
                 window.scrollTo({
                     top: offsetPosition,
                     behavior: 'smooth',
@@ -43,10 +44,21 @@ export default function Home() {
     };
 
     useEffect(() => {
+        
         const fetchLocationAndData = async () => {
+
+            if (hasFetched.current) {
+                console.log("Already fetched location and data");
+                return;
+            }
+            console.log("Fetching location and data for the first time");
+            hasFetched.current = true;
+
             setLoading(true);
 
-            if (navigator.geolocation) {
+            // if (navigator.geolocation) { // Se il browser supporta la geolocalizzazione
+            if (2 % 2 == 1) { // TODO : rimuovi
+                console.log("Geolocation is supported by this browser");
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         const { latitude, longitude } = position.coords;
@@ -97,7 +109,8 @@ export default function Home() {
                         setLoading(false);
                     }
                 );
-            } else {
+            } else { // Se il browser non supporta la geolocalizzazione
+                console.log("Geolocation is not supported by this browser");
                 const res = await fetch("/api/open-classrooms", {
                     method: "GET",
                 });

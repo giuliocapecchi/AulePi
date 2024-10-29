@@ -13,11 +13,12 @@ const errorData: BuildingData = { // Valori fittizi per il building in caso di e
     building: "Error",
     building_code: "ERROR_CODE",
     building_status: "Internal Server Error",
-    rooms: {}, // Valori fittizi
+    rooms: {},
     coordinates: [0, 0], 
     distance: Infinity,
     free: false,
-    isClosed: true 
+    isClosed: true, 
+    buildingAvailableSoon: false,
 };
 
 export default function Left({
@@ -45,13 +46,22 @@ export default function Left({
                 }}
             >
                 {Object.entries(data)
-                    .sort(([, a], [, b]) => {
-                        // Ordinamento per: free (true) -> free (false) -> isClosed (true)
+                    .sort(([a_code, a], [b_code, b]) => {
+                        // Ordinamento per: free (true) -> buildingAvailableSoon (true) -> free (false) -> isClosed (true)
+                        // Prima controlliamo se sono free
                         if (a.free && !b.free) return -1; // a precede b
                         if (!a.free && b.free) return 1; // b precede a
+                        // Se entrambi sono free o entrambi non sono free, controlliamo buildingAvailableSoon
+                        if (a.buildingAvailableSoon && !b.buildingAvailableSoon) return -1; // a precede b
+                        if (!a.buildingAvailableSoon && b.buildingAvailableSoon) return 1; // b precede a
+                        // Se entrambi non sono free e entrambi non sono buildingAvailableSoon, controlliamo isClosed
                         if (a.isClosed && !b.isClosed) return 1; // b precede a se chiuso
                         if (!a.isClosed && b.isClosed) return -1; // a precede b se chiuso
-                        return 0; // lasciali invariati se sono uguali
+
+                        const a_clean = a_code.replace("polo", "").trim();
+                        const b_clean = b_code.replace("polo", "").trim();
+                        console.log(a_clean, b_clean);
+                        return a_clean.localeCompare(b_clean); // Ordina per nome
                     })
                     .map(([buildingCode, building]) => {
                     return (
@@ -62,11 +72,11 @@ export default function Left({
                         >
                             <AccordionTrigger
                             disabled={building.isClosed}
-                            isClosed={building.isClosed} // Passa la prop isClosed all'AccordionTrigger
+                            isClosed={building.isClosed}
                             >
                                 <div className="flex justify-between w-[95%] text-left text-lg group items-center" data-building-code={buildingCode} key={buildingCode}>
                                     <div className="group-hover:underline underline-offset-8 pr-2">
-                                        Building - {buildingCode.replace("polo", "polo ")} 
+                                        Polo: <span className="italic">{buildingCode.replace("polo", "")}</span>
                                     </div>
                                     <div className="flex items-center justify-end">
                                         
@@ -78,7 +88,16 @@ export default function Left({
                             <AccordionContent className="divide-y divide-dashed divide-zinc-600">
                                 {Object.entries(building)
                                     .filter(([roomNumber, room]) => typeof room !== "boolean" && !Array.isArray(room)) // Filtra solo le stanze
-                                    .sort(([, a], [, b]) => (b.free ? 1 : 0) - (a.free ? 1 : 0)) // Ordina per mettere le stanze libere in cima
+                                    .sort(([, a], [, b]) => {
+                                        // Ordinamento per: free (true) -> roomAvailableSoon (true) -> free (false)
+                                        // Prima controlliamo se sono free
+                                        if (a.free && !b.free) return -1; // a precede b
+                                        if (!a.free && b.free) return 1; // b precede a
+                                        // Se entrambi sono free o entrambi non sono free, controlliamo roomAvailableSoon
+                                        if (a.roomAvailableSoon && !b.roomAvailableSoon) return -1; // a precede b
+                                        if (!a.roomAvailableSoon && b.roomAvailableSoon) return 1; // b precede a
+                                        return 0; // Nessun cambiamento
+                                    }) // Ordina per mettere le stanze libere in cima
                                     .map(([roomNumber, room]) => (
                                         <div
                                             key={roomNumber}
@@ -89,10 +108,13 @@ export default function Left({
                                                     {roomNumber}
                                                 </div>
                                                 <div className="relative">
-                                                    {room.free === false ? (
-                                                        <div className="h-2 w-2 rounded-full bg-red-400"></div>
-                                                    ) : (
+                                                    {room.free === true ? (
                                                         <div className="h-2 w-2 rounded-full bg-green-400"></div>
+
+                                                    ) : room.roomAvailableSoon === true ? (
+                                                        <div className="h-2 w-2 rounded-full bg-orange-400"></div>
+                                                    ) : (
+                                                        <div className="h-2 w-2 rounded-full bg-red-400"></div>
                                                     )}
                                                 </div>
                                             </div>
@@ -137,22 +159,22 @@ function formatTime(timeString: string) {
 
 // Funzione per ottenere la label colorata per un building, a seconda dello stato e dell'ora
 function getAvailabilityDiv(building: BuildingData): JSX.Element {
-    if (building.isClosed) {
-        return (
-            <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
-                closed
-            </div>
-        );
-    } else if (building.free) {
+    if (building.free && !building.isClosed) { // Se l'edificio è disponibile
         return (
             <div className="bg-green-800/20 text-green-300/90 rounded-lg px-2 py-1 text-sm">
                 rooms available
             </div>
         );
-    } else {
+    }else if (building.buildingAvailableSoon && !building.isClosed) { // Se l'edificio è disponibile a breve
         return (
             <div className="bg-red-700/20 text-orange-300/80 rounded-lg px-2 py-1 text-sm">
-                unavailable
+                available soon
+            </div>
+        );
+    } else { // L'edificio non è disponibile
+        return (
+            <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
+                unavailable now
             </div>
         );
     }

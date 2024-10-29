@@ -2,12 +2,12 @@ export interface Lesson {
     end: string;
     professor: string;
     start: string;
-    summary: string;
 }
 
 export interface Room {
     free: boolean;
     lessons?: Lesson[];
+    roomAvailableSoon?: boolean;
 }
 
 export interface BuildingData {
@@ -19,4 +19,5 @@ export interface BuildingData {
     distance: number;               // Distanza dall'utente o da un punto di riferimento
     free: boolean;                  // Se è true, nell'edificio almeno una stanza è disponibile
     isClosed?: boolean;             // Stato di chiusura dell'edificio, opzionale
+    buildingAvailableSoon?: boolean;      // Se è true, l'edificio sarà disponibile a breve
 }

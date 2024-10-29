@@ -26,7 +26,7 @@ export async function POST(req: Request) {
         const { lat, lng } = await req.json();
 
         // Send the user location to the backend
-        console.log("backend url in route.ts: ", backendUrl);
+        console.log("POST method, backend url in route.ts: ", backendUrl);
         const response = await fetch(
             backendUrl+"/api/open-classrooms",
             {
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
 export async function GET() {
     try {
-        console.log("backend url in route.ts: ", backendUrl);
+        console.log("GET method, backend url in route.ts: ", backendUrl);
         // Fetch the default data without location
         const response = await fetch(
             backendUrl+"/api/open-classrooms",

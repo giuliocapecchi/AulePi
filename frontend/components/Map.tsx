@@ -22,17 +22,18 @@ export default function Map({
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
-    function getColorByStatus(status: boolean, isClosed: boolean) {
-        if (status && !isClosed) {
+    function getColorByStatus(free: boolean, isClosed: boolean, buildingAvailableSoon: boolean) {
+        if (free && !isClosed) {
                 return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
-        }else if(!status && !isClosed){
-                return "h-3 w-3 rounded-full bg-orange-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+        }else if(buildingAvailableSoon && !isClosed){
+                return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px_rgba(255,165,0,0.7)]"; // Ombra arancione
         }else{
-            return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
+                return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }
     }
 
     useEffect(() => {
+        console.log("Rendering map...");
         if (mapboxToken) {
             mapboxgl.accessToken = mapboxToken;
         } else {
@@ -46,7 +47,6 @@ export default function Map({
             zoom: zoom,
             pitch: pitch,
         });
-
         mapRef.current.on("move", () => {
             if (mapRef.current) {
                 const mapCenter = mapRef.current.getCenter();
@@ -58,7 +58,6 @@ export default function Map({
                 setPitch(mapPitch);
             }
         });
-
         if (typeof data === 'object' && data !== null) {
             Object.entries(data).forEach(([buildingCode, building]) => {
                 const el = document.createElement("div");
@@ -66,7 +65,7 @@ export default function Map({
 
                 // Create the marker circle
                 const markerCircle = document.createElement("div");
-                markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean);
+                markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean, building.buildingAvailableSoon as boolean);
                 el.appendChild(markerCircle);
 
                 // Create the label
@@ -99,7 +98,7 @@ export default function Map({
         } else {
             console.error("Data is not an object:", data);
         }
-
+        console.log("Markers added to the map");
         if (userPos) {
             const e2 = document.createElement("div");
             e2.className =
@@ -128,19 +127,19 @@ export default function Map({
                 <div className="flex items-center gap-0">
                     <div className="h-2 w-2 rounded-full bg-green-400 flex-none"></div>
                     <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-green-800/30 text-green-300/90">
-                        free room 
-                    </div>
-                </div>
-                <div className="flex items-center gap-0">
-                    <div className="h-2 w-2 rounded-full bg-red-400 flex-none"></div>
-                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
-                        closed
+                        available rooms
                     </div>
                 </div>
                 <div className="flex items-center gap-0">
                     <div className="h-2 w-2 rounded-full bg-orange-400 flex-none"></div>
                     <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-orange-700/30 text-orange-300/90">
-                        unavailable
+                        available in <span className="italic">&lt; 30 mins</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-0">
+                    <div className="h-2 w-2 rounded-full bg-red-400 flex-none"></div>
+                    <div className="ml-2 rounded-lg px-2 py-1 text-sm w-full bg-red-700/30 text-red-300/90">
+                        unavailable now
                     </div>
                 </div>
             </div>
