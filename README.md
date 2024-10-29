@@ -1,14 +1,14 @@
-<div style="border-bottom: 1px solid gray; padding-bottom: 5px; margin-bottom: 20px">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="margin: 0; border-bottom: none; font-size: 4em;">AulePi</h1>
-        <img src="./frontend/public/logo.svg" alt="Logo" style="height: 5.5em; margin-left: 10px; margin-right: 30px" />
-    </div>
+# AulePi
+
+<div style="display: flex; flex-direction: row-reverse; align-items: center; padding-bottom: 5px; border-bottom: 1px solid gray; margin-bottom: 20px;"> 
+    <img src="./frontend/public/logo.svg" alt="Logo" style="height: 10em; margin-left: 20px;">
+    <p style="text-align: justify;"> 
+        Tired of wandering around the educational buildings in Pisa looking for a free room? AulePi is designed for you! This web application helps you find the closest free classroom where you can continue your studies or take a moment to relax.
+    </p>
 </div>
 
+<img src="AulePi_demo_image.png" alt="Demo Image" style="width: 100%; border-radius: 20px; margin-top: 20px;">
 
-Tired of wandering around the educational buildings in Pisa? AulePi is designed for you! This web application helps you find the closest free classroom where you can continue your studies or take a moment to relax.
-
-![alt text](AulePi_demo_image.png)
 
 
 
