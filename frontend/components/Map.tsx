@@ -15,10 +15,39 @@ export default function Map({
 }) {
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
+    
+    const isUserInPisa = (position: [number, number]): boolean => {
+        const [latitude, longitude] = position;
 
-    const [center, setCenter] = useState<[number, number]>([10.3880886, 43.7207943]);
-    const [zoom, setZoom] = useState(16.25);
-    const [pitch, setPitch] = useState(52);
+        // Definisci i confini di Pisa (latitudine, longitudine)
+        const pisaBounds = {
+            north: 43.7366, // Limite nord
+            south: 43.7072, // Limite sud
+            east: 10.4271,  // Limite est
+            west: 10.3643,  // Limite ovest
+        };
+
+        // Verifica se la posizione dell'utente è all'interno dei confini
+        return (
+            latitude >= pisaBounds.south &&
+            latitude <= pisaBounds.north &&
+            longitude >= pisaBounds.west &&
+            longitude <= pisaBounds.east
+        );
+    };
+
+    const [center, setCenter] = useState<[number, number]>(
+        userPos && isUserInPisa(userPos) 
+            ? [userPos[1], userPos[0]]
+            : window.innerWidth < 768
+                ? [10.390978, 43.718735] // Centro per i dispositivi mobili
+                : [10.395310, 43.716592] // Centro per i dispositivi desktop
+    );
+
+    const [zoom, setZoom] = window.innerWidth < 768
+        ? useState(16.0) // Zoom per telefoni
+        : useState(16) // Zoom per pc
+    const [pitch, setPitch] = useState(69.97);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 

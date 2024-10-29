@@ -58,27 +58,6 @@ def get_open_classrooms():
     return response
 
 
-@app.route('/api/open-classrooms', methods=['POST'])
-def post_open_classrooms():
-
-    print("Method post")
-    user_lat = 0
-    user_lng = 0
-    user_location = request.get_json()
-
-    if user_location is None:
-        return jsonify({"error": "No data provided"}), 400
-
-    user_lat = user_location.get('lat')
-    user_lng = user_location.get('lng')
-
-    if user_lat is None or user_lng is None:
-        return jsonify({"error": "Invalid location data. 'lat' and 'lng' are required."}), 400
-    
-    # TODO : missing implementation (get the closest open classrooms)
-    
-
-
 if __name__ == '__main__':
     #app.run(host='0.0.0.0', port=8080, debug=True)
     update_calendars()

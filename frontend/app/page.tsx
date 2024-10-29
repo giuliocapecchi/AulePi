@@ -44,7 +44,7 @@ export default function Home() {
     };
 
     useEffect(() => {
-        
+
         const fetchLocationAndData = async () => {
 
             if (hasFetched.current) {
@@ -56,66 +56,41 @@ export default function Home() {
 
             setLoading(true);
 
-            // if (navigator.geolocation) { // Se il browser supporta la geolocalizzazione
-            if (2 % 2 == 1) { // TODO : rimuovi
+            if (navigator.geolocation) { // Se il browser supporta la geolocalizzazione
                 console.log("Geolocation is supported by this browser");
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         const { latitude, longitude } = position.coords;
                         setUserPos([latitude, longitude]);
-
-                        try {
-                            const res = await fetch("/api/open-classrooms", {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify({
-                                    lat: latitude,
-                                    lng: longitude,
-                                }),
-                            });
-
-                            // Controlla se la risposta non è 200
-                            if (!res.ok) {
-                                const errorData = await res.json();
-                                throw new Error(errorData.error || 'Unknown error occurred');
-                            }
-
-                            const fetchedData: { [key: string]: BuildingData } = await res.json();
-
-                            // Set isClosed for each building
-                            const updatedData = Object.fromEntries(
-                                Object.entries(fetchedData).map(([buildingCode, buildingData]) => [
-                                    buildingCode,
-                                    {
-                                        ...buildingData,
-                                        isClosed: isBuildingClosed(buildingCode),
-                                    },
-                                ])
-                            );
-
-                            setData(updatedData);
-                        } catch (error) {
-                            console.error("Failed to fetch data from backend:", error);
-                        } finally {
-                            setLoading(false);
-                        }
                     },
-                    async () => {
-                        const res = await fetch("/api/open-classrooms");
-                        const defaultData: { [key: string]: BuildingData } = await res.json();
-                        setData(defaultData);
-                        setLoading(false);
-                    }
                 );
-            } else { // Se il browser non supporta la geolocalizzazione
+            } else {
                 console.log("Geolocation is not supported by this browser");
+            }
+            try {
                 const res = await fetch("/api/open-classrooms", {
                     method: "GET",
                 });
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.error || 'Unknown error occurred');
+                }
                 const defaultData: { [key: string]: BuildingData } = await res.json();
-                setData(defaultData);
+                // Set isClosed for each building
+                const updatedData = Object.fromEntries(
+                    Object.entries(defaultData).map(([buildingCode, buildingData]) => [
+                        buildingCode,
+                        {
+                            ...buildingData,
+                            isClosed: isBuildingClosed(buildingCode),
+                        },
+                    ])
+                );
+                setData(updatedData);
+            }
+            catch (error) {
+                console.error("Failed to fetch data from backend:", error);
+            } finally {
                 setLoading(false);
             }
         };

@@ -20,46 +20,6 @@ interface dataFormat {
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-export async function POST(req: Request) {
-    try {
-        // Extract user location from the request body
-        const { lat, lng } = await req.json();
-
-        // Send the user location to the backend
-        console.log("POST method, backend url in route.ts: ", backendUrl);
-        const response = await fetch(
-            backendUrl+"/api/open-classrooms",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ lat, lng }),
-            }
-        );
-
-        if (!response.ok) {
-            return NextResponse.json(
-                { error: "Failed to fetch data" },
-                { status: 500 }
-            );
-        }
-
-        // Get data from backend
-        const data: dataFormat[] = await response.json();
-        // Print the data to the console
-        //console.log("Data from backend: ", data); 
-
-        return NextResponse.json(data);
-    } catch (error) {
-        console.error("Error in route:", error);
-        return NextResponse.json(
-            { error: "Failed to process request" },
-            { status: 500 }
-        );
-    }
-}
-
 export async function GET() {
     try {
         console.log("GET method, backend url in route.ts: ", backendUrl);

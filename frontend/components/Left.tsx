@@ -60,7 +60,6 @@ export default function Left({
 
                         const a_clean = a_code.replace("polo", "").trim();
                         const b_clean = b_code.replace("polo", "").trim();
-                        console.log(a_clean, b_clean);
                         return a_clean.localeCompare(b_clean); // Ordina per nome
                     })
                     .map(([buildingCode, building]) => {
