@@ -48,19 +48,22 @@ export default function Left({
                 {Object.entries(data)
                     .sort(([a_code, a], [b_code, b]) => {
                         // Ordinamento per: free (true) -> buildingAvailableSoon (true) -> free (false) -> isClosed (true)
+                        // Prima controlliamo se sono chiusi
+                        if (a.isClosed && !b.isClosed) return 1; // b precede a se chiuso
+                        if (!a.isClosed && b.isClosed) return -1; // a precede b se chiuso
                         // Prima controlliamo se sono free
                         if (a.free && !b.free) return -1; // a precede b
                         if (!a.free && b.free) return 1; // b precede a
                         // Se entrambi sono free o entrambi non sono free, controlliamo buildingAvailableSoon
                         if (a.buildingAvailableSoon && !b.buildingAvailableSoon) return -1; // a precede b
                         if (!a.buildingAvailableSoon && b.buildingAvailableSoon) return 1; // b precede a
-                        // Se entrambi non sono free e entrambi non sono buildingAvailableSoon, controlliamo isClosed
-                        if (a.isClosed && !b.isClosed) return 1; // b precede a se chiuso
-                        if (!a.isClosed && b.isClosed) return -1; // a precede b se chiuso
+                        // Ordina per nome
+                        const a_clean = a_code.replace(/[^a-zA-Z0-9\s]/g, "").trim().toLowerCase();
+                        const b_clean = b_code.replace(/[^a-zA-Z0-9\s]/g, "").trim().toLowerCase();
+                        const comparisonResult = a_clean.localeCompare(b_clean, undefined, { sensitivity: 'base' });
+                        //console.log(`Comparing "${a_clean}" with "${b_clean}": ${comparisonResult}`);
+                        return comparisonResult; // Ordina per nome
 
-                        const a_clean = a_code.replace("polo", "").trim();
-                        const b_clean = b_code.replace("polo", "").trim();
-                        return a_clean.localeCompare(b_clean); // Ordina per nome
                     })
                     .map(([buildingCode, building]) => {
                     return (
