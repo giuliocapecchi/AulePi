@@ -26,7 +26,7 @@ export default function Map({
         if (free && !isClosed) {
                 return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
         }else if(buildingAvailableSoon && !isClosed){
-                return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px_rgba(255,165,0,0.7)]"; // Ombra arancione
+                return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px_rgba(255,165,0,0.7)]";
         }else{
                 return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px_rgba(239,68,68,0.9)]";
         }
