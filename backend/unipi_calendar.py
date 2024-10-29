@@ -281,7 +281,7 @@ def load_calendars_and_parse():
         parse_aule_csv(aule_csv_content)
             
     initialize_buildings_status(all_lessons)
-    #building_to_csv(buildings_status)
+    building_to_csv(buildings_status)
     
     return all_lessons  # Restituisci tutte le lezioni accumulate
 
