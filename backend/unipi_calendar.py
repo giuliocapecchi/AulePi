@@ -30,6 +30,7 @@ poli_calendar_ids = {
             'poloP.Boileau': '6501c860675557007eb417c0',
             'poloS.Rossore': '63247d5f75616d04046a0779',
             'poloSapienza' : '63247af9ac73c806bfa2def2',
+            'poloFarmacia' : '5dd7953c1c9f510011e17fbf'
             }
 
 poli_coordinates = {
@@ -48,7 +49,8 @@ poli_coordinates = {
             'poloP.Ricci': [10.396921563725783, 43.717686512092854],
             'poloP.Boileau' : [10.397074275993532, 43.71998968935904],
             'poloS.Rossore': [10.392641884389207, 43.717998675187204],
-            'poloSapienza' : [10.399496403929106, 43.717311583201365]
+            'poloSapienza' : [10.399496403929106, 43.717311583201365],
+            'poloFarmacia' : [10.3889513118217, 43.71661901268172]
             }
 
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
@@ -103,14 +105,18 @@ def delete_blob_by_filename(filename):
 def get_unipi_calendars():
     global poli_calendar_ids
 
+    # url iniziale per ottenere id del calendario
+    url_filtro = "https://unipi.prod.up.cineca.it/api/FiltriICal/creaFiltroICal"
+    url_filtro_farmacia = "https://unich.prod.up.cineca.it/api/FiltriICal/creaFiltroICal"
+
     # URL base per ottenere gli impegni, da concatenare con l'id ricevuto
     base_url = "https://unipi.prod.up.cineca.it:443/api/FiltriICal/impegniICal?id="
+    base_url_farmacia = "https://unich.prod.up.cineca.it/api/FiltriICal/impegniICal?id="
 
     
 
     for polo in poli_calendar_ids:
         # Esegui la prima richiesta per ottenere l'ID
-        url_filtro = "https://unipi.prod.up.cineca.it/api/FiltriICal/creaFiltroICal"
         headers = {
             "Content-Type": "application/json;charset=UTF-8",
             "Accept": "application/json, text/plain, */*",
@@ -126,23 +132,39 @@ def get_unipi_calendars():
         dataScadenza = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T23:00:00.000Z"
 
         # Payload per la richiesta
-        data = {
+
+        if polo == 'poloFarmacia':
+            data = {
+            "clienteId": "5a65a9ebd9fe4f6d0ccf9df6",
+            "dataA": dataA,
+            "dataDa": dataDa,
+            "dataScadenza": dataScadenza,
+            "linkCalendarioId": poli_calendar_ids[polo],
+            }
+        else:
+            data = {
             "clienteId": "628de8b9b63679f193b87046",
             "dataA": dataA,
             "dataDa": dataDa,
             "dataScadenza": dataScadenza,
             "linkCalendarioId": poli_calendar_ids[polo],
-        }
+            }
+            
 
         # Effettua la chiamata POST per ottenere l'ID
-        response = requests.post(url_filtro, headers=headers, json=data)
+        url_id = url_filtro_farmacia if polo == 'poloFarmacia' else url_filtro
+        response = requests.post(url_id, headers=headers, json=data)
+        
 
         if response.status_code == 200:
             # Estrai l'ID dalla risposta
             id_impegni = response.json().get("id")
             
             # Crea il link completo concatenando l'ID
-            final_url = base_url + id_impegni
+            if polo == 'poloFarmacia':
+                final_url = base_url_farmacia + id_impegni
+            else:
+                final_url = base_url + id_impegni
 
             # Effettua la chiamata GET al link finale per scaricare il file
             response_impegni = requests.get(final_url, stream=True)
