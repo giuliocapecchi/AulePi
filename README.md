@@ -43,6 +43,7 @@ AulePi highlights available classrooms in Pisa by utilizing a public API provide
 
 ## Deployment
 Both the frontend and backend of AulePi are hosted on Vercel, ensuring reliable performance and easy scalability. This platform provides seamless integration with Git, allowing for automatic deployments with each push to the repository.
+Check it out [here](https://aulepi.vercel.app)!
 
 ## Future Enhancements
 - Classroom Visualization: In addition to displaying buildings, we could also showcase classrooms on the map. One approach could be to display a large marker when zoomed out, which transitions into individual classroom markers as the user zooms in. However, challenges may arise with multi-story buildings, and alternative solutions might need to be explored (indeed, this would be extremely cool if implemented).
