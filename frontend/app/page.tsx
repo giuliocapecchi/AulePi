@@ -7,7 +7,6 @@ import Loading from "@/components/Loading";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BuildingData } from "@/types/interfaces";
-import { Analytics } from "@vercel/analytics/react"; // Import the Analytics component for Vercel Analytics
 
 export default function Home() {
     const [data, setData] = useState<{ [key: string]: BuildingData }>({});
