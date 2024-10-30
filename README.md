@@ -19,6 +19,16 @@ AulePi highlights available classrooms in Pisa by utilizing a public API provide
 - 3D Map Exploration: The application uses *Mapbox GL* for an interactive 3D view, enabling newly enrolled or Erasmus students to visually discover the locations of buildings without navigating the university's websites.
 - Real-Time Availability: Classroom availability is refreshed with each page load, ensuring to provide accurate and valuable information every time.
 
+**Example**: If I'm located near the engineering educational complex, I can quickly determine the following:
+
+1. Polo A and Polo F currently do not have any available rooms.
+2. Polo C has at least one room available.
+3. Polo B has a room (*IngB23*) that will become available in 30 minutes or less. Additionally, the room schedule indicates that it will be free for two hours.
+
+
+<img src="./poloB_available_soon.png" alt="Polo B is available soon" style="margin-top: 20px; margin-bottom: 20px;">
+
+
 ## Tech Stack
 ### Frontend
 * Next.js: Utilizes server-side rendering to create a robust React-based framework for building the frontend user interface.
