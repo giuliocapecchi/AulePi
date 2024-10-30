@@ -101,7 +101,11 @@ export default function Left({
                                             >
                                                 <div className="flex gap-4 items-center h-[fit-content]">
                                                     <div className="w-18">
-                                                        {roomNumber.replace(/\(.*?\)/, "")}
+                                                    {roomNumber
+                                                        .replace(/\(.*?\)/g, "")
+                                                        .replace(/[^\w\s.]/g, "")
+                                                        .trim()
+                                                    }
                                                     </div>
                                                     <div className="relative">
                                                         {room.free === true ? (
