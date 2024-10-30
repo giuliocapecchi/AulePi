@@ -112,8 +112,6 @@ export default function Home() {
                         sizes="100vw"
                         style={{ width: 'auto', height: '93%' }}
                         alt="Logo"
-                        priority={true}
-                        fetchPriority="high"
                     />
                     <Alert className="h-fit text-pretty w-40">
                         <AlertDescription>
