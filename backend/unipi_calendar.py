@@ -4,7 +4,6 @@ from zoneinfo import ZoneInfo  # Python 3.9+
 import io
 import requests
 import csv
-import vercel_blob
 from dotenv import load_dotenv
 
 
@@ -52,51 +51,6 @@ poli_coordinates = {
             'poloSapienza' : [10.399496403929106, 43.717311583201365],
             'poloFarmacia' : [10.3889513118217, 43.71661901268172]
             }
-
-# ----------------------------- VercelFS utility functions ------------------------------------------------- #
-
-def list_all_blobs():
-    blobs = vercel_blob.list({
-        'limit': '5',
-    })
-    return blobs
-
-
-def upload_a_blob(file_name, file_content):
-    file_content_bytes = file_content.encode('utf-8')  # Codifica la stringa in bytes
-    resp = vercel_blob.put(file_name, file_content_bytes, {
-                "addRandomSuffix": "false",
-            })
-    print("Vercel response : ",resp,"\n")
-
-
-def download_file_from_vercelFS(filename):
-    blobs = list_all_blobs()
-    for blob in blobs['blobs']:
-        if blob['pathname'] == filename:
-            response = requests.get(blob['url'])
-            if response.status_code == 200:
-                content = response.content.decode('utf-8')
-                print(f"{filename} caricato in memoria con successo.")
-                #print(content)
-                if content != None and content != "":
-                    return content
-            else:
-                print(f"Errore nel download di {filename}: {response.status_code}")
-                return
-    print(f"File {filename} non trovato su VercelFS.")
-
-
-def delete_blob_by_filename(filename):
-    # Trova l'URL del blob utilizzando il nome del file
-    blobs = list_all_blobs()
-    for blob in blobs['blobs']:
-        if blob['pathname'] == filename:
-            # Elimina il blob se trovato
-            resp = vercel_blob.delete(blob['url'])
-            print(f"Eliminato {filename}: {resp}")
-    else:
-        print(f"File {filename} non trovato.")
 
 
 # ----------------------------- functions to interact with the university of Pisa APIs ------------------------------------------------- #
@@ -315,7 +269,14 @@ def load_calendars_and_parse():
         all_lessons.extend(lessons)
     print("Calendari caricati con successo.")
     load_dotenv()
-    aule_csv_content = download_file_from_vercelFS("aule.csv")
+    # metti ./aule.csv dentro aule_csv_content
+    try:
+        with open("aule.csv", "r") as f:
+            aule_csv_content = f.read()
+    except FileNotFoundError:
+        print("Il file 'aule.csv' non esiste.")
+        aule_csv_content = None
+
     if aule_csv_content != None and aule_csv_content != "":
         parse_aule_csv(aule_csv_content)
             
@@ -512,6 +473,8 @@ def building_to_csv(buildings_status):
         aule_csv_content = f.getvalue()
         # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
         # quindi non serve la delete del file
-        upload_a_blob("aule.csv", aule_csv_content)
+        print(aule_csv_content)
+        with open("aule.csv", "w",newline='') as file:
+            file.write(aule_csv_content)
 
     f.close()
