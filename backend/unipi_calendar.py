@@ -338,6 +338,9 @@ def initialize_buildings_status(lessons):
     # Itera su tutte le lezioni
     for lesson in lessons:
         polo = lesson['polo']
+        if is_building_closed(polo, now):
+            print("Skipped lesson in closed building: ", lesson)
+            continue
         location = lesson['location']
         start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
         end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
@@ -394,6 +397,7 @@ def initialize_buildings_status(lessons):
                 'end': end_time.strftime('%Y-%m-%d %H:%M:%S'),
             })
             
+            
             # Se c'è una lezione in corso al momento, l'aula non è libera
             if start_time <= now <= end_time:
                 buildings_status[polo][location]['free'] = False
@@ -404,11 +408,20 @@ def initialize_buildings_status(lessons):
                 buildings_status[polo]['buildingAvailableSoon'] = True
     
     for polo in buildings_status:
+        if is_building_closed(polo, now):
+            buildings_status[polo]['isClosed'] = True
+            buildings_status[polo]['free'] = False
+            buildings_status[polo]['buildingAvailableSoon'] = False
+            continue
+        else:
+            buildings_status[polo]['isClosed'] = False
+            buildings_status[polo]['free'] = False
+            buildings_status[polo]['buildingAvailableSoon'] = False
+
         # Imposta inizialmente il polo come non libero e non disponibile a breve
         is_building_free = False
-        # Se il polo ha almeno una aula liberata, il polo è considerato libero
         for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
                 if buildings_status[polo][location]['free'] == True:
                     is_building_free = True
                     break
@@ -430,7 +443,7 @@ def get_buildings_status():
     now = datetime.now(pisa_timezone)
     for polo in buildings_status:
         for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
                 # Rimuovi le lezioni terminate
                 buildings_status[polo][location]['lessons'] = [lesson for lesson in buildings_status[polo][location]['lessons']
                                                                if datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now]
@@ -464,7 +477,7 @@ def get_buildings_status():
         # Se il polo ha almeno una aula liberata, il polo è considerato libero
         buildings_status[polo]['free'] = False
         for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free','isClosed']:
                 if buildings_status[polo][location]['free'] == True:
                     buildings_status[polo]['free'] = True
                     break
@@ -472,7 +485,7 @@ def get_buildings_status():
         # se il polo ha almeno una aula che sarà libera entro 30 minuti, il polo è considerato disponibile a breve
         buildings_status[polo]['buildingAvailableSoon'] = False
         for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
+            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
                 if buildings_status[polo][location]['roomAvailableSoon'] == True:
                     buildings_status[polo]['buildingAvailableSoon'] = True
                     break
