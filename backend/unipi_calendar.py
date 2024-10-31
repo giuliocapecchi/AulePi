@@ -201,6 +201,10 @@ def parse_ics(ics_file):
         # Trova la descrizione, se esiste
         description_match = re.search(r'DESCRIPTION:(.*?)\n', event)
         description = description_match.group(1) if description_match else "No description"
+        # taglia via tutto ciò che segue "nNOTE" dalla descrizione
+        description = description.split("\nNOTE")[0]
+        # rimuove tutte le '\r' dalla descrizione
+        description = description.replace("\r", "")
         
         # Trova l'inizio, se esiste
         dtstart_match = re.search(r'DTSTART:(.*?)\n', event)
@@ -231,10 +235,6 @@ def parse_ics(ics_file):
         aula = location.split("-")[0]  # Ottieni solo l'aula
         polo = location.split("-")[1]  # Ottieni solo il polo
         aula = aula.replace(" ", "")
-
-        if polo == 'polo B' and aula == 'IngSI7':
-            continue
-                
         # Aggiunge l'evento parsato alla lista
         parsed_events.append({
             'professor': description,
@@ -360,10 +360,34 @@ def initialize_buildings_status(lessons):
         
         # Confronta l'orario per selezionare lezioni future o in corso oggi
         if start_time.date() == now.date() and end_time > now:
-            # rimuovi tutte le '\' da 'lesson['professor']
-            lesson['professor'] = lesson['professor'].replace("\\", "")
-            # rimuovi '\nNOTE:'
-            lesson['professor'] = lesson['professor'].split("\nNOTE:")[0]
+            if lesson['professor'] != "No description" and len(lesson['professor']) > 0:
+                # rimuovi '\nNOTE:' e tutto ciò che segue da 'lesson['professor']
+                lesson['professor'] = lesson['professor'].split("\\nNOTE")[0]
+                # rimuovi tutte le '\' da 'lesson['professor']
+                lesson['professor'] = lesson['professor'].replace("\\", "")
+                lesson['professor'] = lesson['professor'].replace(" \\(.*?\\)", "")
+                # Divide i nomi separati da virgola
+                cleaned_professors_list = lesson['professor'].split(",")
+            
+                # Rimuove caratteri indesiderati e formatta i nomi
+                cleaned_professors_list = [
+                    prof.strip().split(".")[-1].strip() if "." in prof else " ".join(prof.split()[:-1])
+                    for prof in cleaned_professors_list
+                ]
+
+                # Unisce i nomi dei professori
+                cleaned_professors = ", ".join(cleaned_professors_list)
+            
+                # Limita a 70 caratteri
+                if len(cleaned_professors) <= 70:
+                    lesson['professor'] = cleaned_professors
+                    # mette tutti i nomi in uppercase
+                    lesson['professor'] = lesson['professor'].upper()
+                else:
+                    lesson['professor'] = 'No description'
+            else:
+                lesson['professor'] = 'No description'
+
             buildings_status[polo][location]['lessons'].append({
                 'professor': lesson['professor'],
                 'start': start_time.strftime('%Y-%m-%d %H:%M:%S'),
@@ -379,11 +403,9 @@ def initialize_buildings_status(lessons):
                 buildings_status[polo][location]['roomAvailableSoon'] = True
                 buildings_status[polo]['buildingAvailableSoon'] = True
     
-    # Se il polo ha almeno una aula liberata, il polo è considerato libero
     for polo in buildings_status:
         # Imposta inizialmente il polo come non libero e non disponibile a breve
         is_building_free = False
-        
         # Se il polo ha almeno una aula liberata, il polo è considerato libero
         for location in buildings_status[polo]:
             if location not in ['coordinates', 'buildingAvailableSoon', 'free']:
@@ -515,3 +537,58 @@ def building_to_csv(buildings_status):
         upload_a_blob("aule.csv", aule_csv_content)
 
     f.close()
+
+
+def is_building_closed(polo: str, now: datetime) -> bool:
+    current_hour = now.hour + now.minute / 60  # Convertiamo i minuti in ore decimali
+    current_day = now.weekday()  # Lunedì è 0, Domenica è 6
+
+    # Domenica: tutti i poli chiusi tranne poloF e poloPN (8:30 - 24)
+    if current_day == 6 and not (polo == 'poloF' or polo == 'poloPN'):
+        return True
+    elif current_day == 6 and (polo == 'poloF' or polo == 'poloPN'):
+        return current_hour < 8.5 or current_hour >= 24
+
+    # Sabato: poloA e poloB aperti dalle 7:30 alle 14
+    if current_day == 5 and (polo == 'poloA' or polo == 'poloB'):
+        return current_hour < 7.5 or current_hour >= 14
+
+    # Sabato: poloC e poloEconomia aperti dalle 8 alle 13
+    if current_day == 5 and (polo == 'poloC' or polo == 'poloEconomia'):
+        return current_hour < 8 or current_hour >= 13
+
+    # Lunedì - Venerdì: poloA e poloB aperti dalle 7:30 alle 20
+    if 0 <= current_day <= 4 and (polo == 'poloA' or polo == 'poloB'):
+        return current_hour < 7.5 or current_hour >= 20
+
+    # Lunedì - Venerdì: poloC aperto dalle 7:30 alle 19:30
+    if 0 <= current_day <= 4 and polo == 'poloC':
+        return current_hour < 7.5 or current_hour >= 19.5
+
+    # Lunedì - Sabato: poloF e poloPN aperti dalle 8 alle 24
+    if 0 <= current_day <= 5 and (polo == 'poloF' or polo == 'poloPN'):
+        return current_hour < 8 or current_hour >= 24
+
+    # Lunedì - Venerdì: poloFibonacci aperto dalle 8 alle 19
+    if 0 <= current_day <= 4 and polo == 'poloFibonacci':
+        return current_hour < 8 or current_hour >= 19
+
+    # Lunedì - Venerdì: poloBenedettine e poloEconomia aperti dalle 8 alle 19:30
+    if 0 <= current_day <= 4 and (polo == 'poloBenedettine' or polo == 'poloEconomia'):
+        return current_hour < 8 or current_hour >= 19.5
+
+    # Sabato: poloBenedettine aperto dalle 8:30 alle 14
+    if current_day == 5 and polo == 'poloBenedettine':
+        return current_hour < 8.5 or current_hour >= 14
+
+    # Lunedì - Venerdì: poloPiagge aperto dalle 8 alle 24
+    if 0 <= current_day <= 4 and polo == 'poloPiagge':
+        return current_hour < 8 or current_hour >= 24
+
+    # Lunedì - Venerdì: altri poli aperti dalle 8 alle 19:30
+    if 0 <= current_day <= 4 and polo in ['poloCarmignani', 'poloGuidotti', 'poloNobili', 'poloP.Ricci', 
+                                           'poloP.Boileau', 'poloS.Rossore', 'poloSapienza']:
+        return current_hour < 8 or current_hour >= 19.5
+
+    # Per qualsiasi altra combinazione, consideriamo aperto
+    return False

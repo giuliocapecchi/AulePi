@@ -127,26 +127,7 @@ export default function Left({
                                                                 {formatTime(lesson.start)} - {formatTime(lesson.end)}
                                                             </div>
                                                             <div className="text-sm text-slate-500 max-w-xs text-right">
-                                                                {lesson.professor !== "No description" && lesson.professor.length > 0
-                                                                    ? (() => {
-                                                                        const cleanedProfessors = lesson.professor
-                                                                            .replace(/nNOTE.*/, "")
-                                                                            .replace(/\(.*?\)/, "")
-                                                                            .split(",")
-                                                                            .map(prof => {
-                                                                                prof = prof.trim();
-
-                                                                                if (prof.includes(".")) {
-                                                                                    return prof.split(".").slice(1).join("").trim();
-                                                                                } else {
-                                                                                    const names = prof.split(" ");
-                                                                                    return names.slice(0, -1).join(" ");
-                                                                                }
-                                                                            })
-                                                                            .join(", ");
-                                                                        return cleanedProfessors.length <= 70 ? cleanedProfessors : "No description";
-                                                                    })()
-                                                                    : "No description"}
+                                                                {lesson.professor}
                                                             </div>
                                                         </li>
                                                     ))}
