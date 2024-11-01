@@ -561,8 +561,8 @@ def is_building_closed(polo: str, now: datetime) -> bool:
     elif current_day == 6 and (polo == 'poloF' or polo == 'poloPN'):
         return current_hour < 8.5 or current_hour >= 24
 
-    # Sabato: poloA e poloB aperti dalle 7:30 alle 14
-    if current_day == 5 and (polo == 'poloA' or polo == 'poloB'):
+    # Sabato: poloA, poloB  e poloFarmacia aperti dalle 7:30 alle 14
+    if current_day == 5 and (polo == 'poloA' or polo == 'poloB' or polo == 'poloFarmacia'):
         return current_hour < 7.5 or current_hour >= 14
 
     # Sabato: poloC e poloEconomia aperti dalle 8 alle 13
@@ -573,8 +573,8 @@ def is_building_closed(polo: str, now: datetime) -> bool:
     if 0 <= current_day <= 4 and (polo == 'poloA' or polo == 'poloB'):
         return current_hour < 7.5 or current_hour >= 20
 
-    # Lunedì - Venerdì: poloC aperto dalle 7:30 alle 19:30
-    if 0 <= current_day <= 4 and polo == 'poloC':
+    # Lunedì - Venerdì: poloC e poloFarmacia aperti dalle 7:30 alle 19:30
+    if 0 <= current_day <= 4 and (polo == 'poloC' or polo == 'poloFarmacia'):
         return current_hour < 7.5 or current_hour >= 19.5
 
     # Lunedì - Sabato: poloF e poloPN aperti dalle 8 alle 24
