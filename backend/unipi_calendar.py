@@ -9,8 +9,8 @@ from dotenv import load_dotenv
 
 
 files = {} # Contiene i calendari (scaricati all'avvio del backend)
-aule_csv_content = None # Contiene il contenuto del file 'aule.csv' scaricato da VercelFS
 buildings_status =  {} # contiene lo stato degli edifici (aggiornato ogni volta che si chiama la funzione get_open_classrooms)
+usually_open_dict = {} # contiene le aule che sono di solito aperte (scaricato all'avvio del backend)
 pisa_timezone = ZoneInfo("Europe/Rome") 
 
 poli_calendar_ids = {
@@ -249,31 +249,41 @@ def parse_ics(ics_file):
 
 def parse_aule_csv(content):
     """
-    Costruisce la variabile globale `buildings_status` a partire dal contenuto del file 'aule.csv' scaricato da VercelFS.
+    Costruisce la variabile globale 'buildings_status' e 'usually_open_dict'  a partire dal contenuto del file 'aule.csv' scaricato da VercelFS.
     """
     global buildings_status
     global poli_coordinates
-
-    f = io.StringIO(content) # Per trattare la stringa come se fosse un file
+    global usually_open_dict
+    
+    f = io.StringIO(content)  # Per trattare la stringa come se fosse un file
     reader = csv.reader(f)
     next(reader)  # Salta l'intestazione
     for row in reader:
         polo = row[0]
         location = row[1]
-        free = row[2] == True
+        usually_open = row[2] == "True"  # Converte la stringa in booleano
+
+        # Aggiungi il polo e l'aula nella struttura 'usually_open_dict'
+        if polo not in usually_open_dict:
+            usually_open_dict[polo] = {}
+        if location not in usually_open_dict[polo]:
+            usually_open_dict[polo][location] = {}
+        usually_open_dict[polo][location]['usually_open'] = usually_open
+
         if polo not in buildings_status:
             buildings_status[polo] = {}
-            # aggiungi le coordinate del polo
+            # Aggiungi le coordinate del polo
             buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            # aggiungi la chiave 'free' e 'availableSoon' per il polo
+            # Aggiungi la chiave 'free' e 'availableSoon' per il polo
             buildings_status[polo]['free'] = False
             buildings_status[polo]['buildingAvailableSoon'] = False
-            # Crea la struttura per l'aula nel polo se non esiste già 
-            if location not in buildings_status[polo]:
-                buildings_status[polo][location] = {
-                    'lessons': [],
-                    'free': free
-                    }
+        
+        # Crea la struttura per l'aula nel polo
+        buildings_status[polo][location] = {
+            'lessons': [],
+            'free': usually_open
+        }
+
     f.close()
 
 
@@ -289,7 +299,6 @@ def parse_and_adjust_time(dt):
 
 
 def load_calendars_and_parse():
-    global aule_csv_content
     global poli_calendar_ids
     global poli_coordinates
 
@@ -321,7 +330,7 @@ def load_calendars_and_parse():
         parse_aule_csv(aule_csv_content)
             
     initialize_buildings_status(all_lessons)
-    building_to_csv(buildings_status)
+    buildings_to_csv()
     
     return all_lessons  # Restituisci tutte le lezioni accumulate
 
@@ -431,6 +440,14 @@ def initialize_buildings_status(lessons):
 
     return buildings_status
 
+
+
+# Funzione per controllare se una location è "usually_open"
+def is_usually_open(polo, location):
+    global usually_open_dict
+    return usually_open_dict.get(polo, {}).get(location, {}).get('usually_open', False)
+
+
 def get_buildings_status():
     """
     Aggiorna e restituisce lo stato attuale degli edifici.
@@ -448,6 +465,12 @@ def get_buildings_status():
                 # Rimuovi le lezioni terminate
                 buildings_status[polo][location]['lessons'] = [lesson for lesson in buildings_status[polo][location]['lessons']
                                                                if datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now]
+
+                if not is_usually_open(polo, location):
+                    print(f"Location {location} in polo {polo} is not usually open.")
+                    buildings_status[polo][location]['free'] = False
+                    buildings_status[polo][location]['roomAvailableSoon'] = False
+                    continue
                 
                 # Imposta inizialmente l'aula come libera
                 buildings_status[polo][location]['free'] = True
@@ -494,70 +517,43 @@ def get_buildings_status():
     return buildings_status
 
 
-def building_to_csv(buildings_status):
+def buildings_to_csv():
     """
     Aggiorna il file 'aule.csv' su VercelFS con le aule libere e occupate.
     Viene chiamata una volta in fase di avvio del backend, dopo aver caricato i calendari.
     """
-    global aule_csv_content
-    aule_esistenti = set()
-    changes = False
+    global usually_open_dict
 
-    # Se il file esiste, carica le aule già presenti nel set
-    if aule_csv_content:
-        f = io.StringIO(aule_csv_content)
-        reader = csv.reader(f)
-        next(reader)  # Salta l'intestazione
-        for row in reader:
-            if len(row) >= 2:
-                aule_esistenti.add((row[0], row[1]))
-        f.close()
-
-    # Creo un nuovo buffer per la scrittura
+     # Crea un oggetto StringIO per gestire il contenuto come una stringa
     f = io.StringIO()
     writer = csv.writer(f)
+    writer.writerow(['polo', 'aula', 'usually_open'])
+    # Itera su usually_open_dict per scrivere i dati
+    for polo, locations in usually_open_dict.items():
+        for location, details in locations.items():
+            print(location)
+             # Salta la riga specifica "PoloC, IngSI7"
+            if polo == "poloC" and location == "IngSI7": # La segreteria ha per sbaglio inserito IngSI7 come aula del C
+                continue
+            if location == 'EcoLabWin(26PC)' or location == 'EcoLabWin(26PC)' or location =='Portatili1(Carrello)' or location == 'EcoLabMac(21PC)':
+                usually_open = False
+            else : 
 
-    # Scrivi l'intestazione se il contenuto è vuoto
-    if not aule_csv_content:
-        writer.writerow(["polo", "aula", "usually_open"])
+                usually_open = details.get('usually_open', False)
+            writer.writerow([polo, location, usually_open])
     
-    # Aggiungi le aule esistenti
-    if aule_csv_content:
-        existing_data = io.StringIO(aule_csv_content)
-        existing_reader = csv.reader(existing_data)
-        writer.writerow(next(existing_reader))  # Scrive l'intestazione
-        for row in existing_reader:
-            writer.writerow(row)  # Scrive le righe esistenti
-        existing_data.close()
-
-    # Aggiungi solo le aule che non sono già presenti
-    for polo in buildings_status:
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'free']:
-                aula = (polo, location)
-                # Controlla se l'aula è già presente
-                if aula not in aule_esistenti:
-                    writer.writerow([polo, location, 'True'])
-                    aule_esistenti.add(aula)  # Aggiungi l'aula al set per evitare duplicati
-                    print("Aggiunto un'aula: ", aula)
-                    changes = True  # Imposta il flag su True perché c'è una modifica
-
-    # Se ci sono state modifiche, aggiorna `aule_csv_content` e aggiorna il file server-side
-    if changes:
-        print("Ci sono stati dei cambiamenti, faccio un upload del nuovo 'aule.csv' su VercelFS.")
-        aule_csv_content = f.getvalue()
-        # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
-        # quindi non serve la delete del file
-        upload_a_blob("aule.csv", aule_csv_content)
-
+    f.seek(0)
+    print("Uplaod del nuovo 'aule.csv' su VercelFS.")
+    aule_csv_content = f.getvalue()
+    # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
+    # quindi non serve la delete del file
+    upload_a_blob("aule.csv", aule_csv_content)
     f.close()
 
 
 def is_building_closed(polo: str, now: datetime) -> bool:
     current_hour = now.hour + now.minute / 60  # Convertiamo i minuti in ore decimali
     current_day = now.weekday()  # Lunedì è 0, Domenica è 6
-
-    return True
 
     # Domenica: tutti i poli chiusi tranne poloF e poloPN (8:30 - 24)
     if current_day == 6 and not (polo == 'poloF' or polo == 'poloPN'):
