@@ -62,7 +62,6 @@ export default function Map({
     }
 
     useEffect(() => {
-        console.log("Rendering map...");
         if (mapboxToken) {
             mapboxgl.accessToken = mapboxToken;
         } else {
@@ -138,7 +137,6 @@ export default function Map({
         } else {
             console.error("Data is not an object:", data);
         }
-        console.log("Markers added to the map");
 
         // Aggiungi il marker per la posizione dell'utente
         if (userPos) {

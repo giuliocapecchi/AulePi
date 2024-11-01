@@ -22,7 +22,6 @@ const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 export async function GET() {
     try {
-        console.log("GET method, backend url in route.ts: ", backendUrl);
         // Fetch the default data without location
         const response = await fetch(
             backendUrl+"/api/open-classrooms",

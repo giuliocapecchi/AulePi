@@ -50,21 +50,19 @@ export default function Home() {
                 console.log("Already fetched location and data");
                 return;
             }
-            console.log("Fetching location and data for the first time");
+            //console.log("Fetching location and data for the first time");
             hasFetched.current = true;
 
             setLoading(true);
 
             if (navigator.geolocation) { // Se il browser supporta la geolocalizzazione
-                console.log("Geolocation is supported by this browser");
+                //console.log("Geolocation is supported by this browser");
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         const { latitude, longitude } = position.coords;
                         setUserPos([latitude, longitude]);
                     },
                 );
-            } else {
-                console.log("Geolocation is not supported by this browser");
             }
             try {
                 const res = await fetch("/api/open-classrooms", {
