@@ -231,7 +231,8 @@ def parse_ics(ics_file):
         # Trova la location, se esiste
         location_match = re.search(r'LOCATION:(.*?)\n', event)
         location = location_match.group(1) if location_match else "No location"
-        
+        if location == "No location":
+            continue
         aula = location.split("-")[0]  # Ottieni solo l'aula
         polo = location.split("-")[1]  # Ottieni solo il polo
         aula = aula.replace(" ", "")
@@ -555,6 +556,8 @@ def building_to_csv(buildings_status):
 def is_building_closed(polo: str, now: datetime) -> bool:
     current_hour = now.hour + now.minute / 60  # Convertiamo i minuti in ore decimali
     current_day = now.weekday()  # Lunedì è 0, Domenica è 6
+
+    return True
 
     # Domenica: tutti i poli chiusi tranne poloF e poloPN (8:30 - 24)
     if current_day == 6 and not (polo == 'poloF' or polo == 'poloPN'):
