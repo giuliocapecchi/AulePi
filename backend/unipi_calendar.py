@@ -554,8 +554,6 @@ def is_building_closed(polo: str, now: datetime) -> bool:
     current_hour = now.hour + now.minute / 60  # Convertiamo i minuti in ore decimali
     current_day = now.weekday()  # Lunedì è 0, Domenica è 6
 
-    print(now)
-
     # Domenica: tutti i poli chiusi tranne poloF e poloPN (8:30 - 24)
     if current_day == 6 and not (polo == 'poloF' or polo == 'poloPN'):
         return True
