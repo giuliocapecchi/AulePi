@@ -467,7 +467,6 @@ def get_buildings_status():
                                                                if datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now]
 
                 if not is_usually_open(polo, location):
-                    print(f"Location {location} in polo {polo} is not usually open.")
                     buildings_status[polo][location]['free'] = False
                     buildings_status[polo][location]['roomAvailableSoon'] = False
                     continue
@@ -531,8 +530,8 @@ def buildings_to_csv():
     # Itera su usually_open_dict per scrivere i dati
     for polo, locations in usually_open_dict.items():
         for location, details in locations.items():
-            print(location)
-             # Salta la riga specifica "PoloC, IngSI7"
+            # TODO : rimuovere la riga successiva
+            # Salta la riga specifica "PoloC, IngSI7"
             if polo == "poloC" and location == "IngSI7": # La segreteria ha per sbaglio inserito IngSI7 come aula del C
                 continue
             if location == 'EcoLabWin(26PC)' or location == 'EcoLabWin(26PC)' or location =='Portatili1(Carrello)' or location == 'EcoLabMac(21PC)':
