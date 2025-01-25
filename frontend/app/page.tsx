@@ -13,6 +13,8 @@ export default function Home() {
     const [activeBuilding, setActiveBuilding] = useState<string | null>(null);
     const [userPos, setUserPos] = useState<[number, number] | null>(null);
     const [loading, setLoading] = useState(true);
+    const [fadeOut, setFadeOut] = useState(false);
+    const [fadeIn, setFadeIn] = useState(false);
     const leftRef = useRef<HTMLDivElement>(null); // Riferimento per il componente Left
     const hasFetched = useRef(false);
 
@@ -78,7 +80,11 @@ export default function Home() {
             catch (error) {
                 console.error("Failed to fetch data from backend:", error);
             } finally {
-                setLoading(false);
+                setTimeout(() => setFadeOut(true), 500); // Trigger fade-out of the loader
+                setTimeout(() => {
+                    setLoading(false);
+                    setFadeIn(true); // Trigger fade-in for the content
+                }, 1000); // Wait for the fade-out animation to finish
             }
         };
 
@@ -86,7 +92,7 @@ export default function Home() {
     }, []);
 
     if (loading) {
-        return <Loading />;
+        return <Loading fadeOut={fadeOut}  />;
     }
 
     return (
