@@ -1,10 +1,9 @@
 "use client";
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import { BuildingData } from "@/types/interfaces";
 
 let mapboxgl: any = null;
 
-// dynamically load Mapbox GL JS and its CSS
 const loadMapboxGL = async () => {
     if (!mapboxgl) {
         const mapboxModule = await import('mapbox-gl');
@@ -19,6 +18,12 @@ const loadMapboxGL = async () => {
     return mapboxgl;
 };
 
+// Kick off Mapbox GL loading as early as possible — runs when this module is first imported,
+// in parallel with the data fetch, so the library is ready when the map mounts.
+if (typeof window !== 'undefined') {
+    loadMapboxGL();
+}
+
 export default function Map({
     data,
     handleMarkerClick,
@@ -30,42 +35,9 @@ export default function Map({
 }) {
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
-    
-    const isUserInPisa = (position: [number, number]): boolean => {
-        const [latitude, longitude] = position;
-
-        // Confini di Pisa
-        const pisaBounds = {
-            north: 43.7366,
-            south: 43.7072,
-            east: 10.4271,
-            west: 10.3643,
-        };
-
-        return (
-            latitude >= pisaBounds.south &&
-            latitude <= pisaBounds.north &&
-            longitude >= pisaBounds.west &&
-            longitude <= pisaBounds.east
-        );
-    };
-
-    // Calcolo iniziale del centro mappa
-    const initialCenter: [number, number] = userPos && isUserInPisa(userPos)
-        ? [userPos[1], userPos[0]]
-        : window.innerWidth < 768
-            ? [10.391578, 43.718735] // Centro per dispositivi mobili
-            : [10.395310, 43.716592]; // Centro per dispositivi desktop
-
-    const [center, setCenter] = useState<[number, number]>(initialCenter);
-    
-    // Imposta lo stato di zoom in base alla larghezza della finestra
-    const [zoom, setZoom] = useState(window.innerWidth < 768 ? 16.0 : 16);
-    const [pitch, setPitch] = useState(69.97);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
-    // Funzione per ottenere il colore in base allo stato
     function getColorByStatus(free: boolean, isClosed: boolean, buildingAvailableSoon: boolean) {
         if (free && !isClosed) {
             return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
@@ -76,12 +48,20 @@ export default function Map({
         }
     }
 
+    const isUserInPisa = (position: [number, number]): boolean => {
+        const [latitude, longitude] = position;
+        const pisaBounds = { north: 43.7366, south: 43.7072, east: 10.4271, west: 10.3643 };
+        return (
+            latitude >= pisaBounds.south && latitude <= pisaBounds.north &&
+            longitude >= pisaBounds.west && longitude <= pisaBounds.east
+        );
+    };
+
     useEffect(() => {
         const initializeMap = async () => {
             try {
-                // load Mapbox GL asynchronously
                 const mapboxModule = await loadMapboxGL();
-                
+
                 if (mapboxToken) {
                     mapboxModule.accessToken = mapboxToken;
                 } else {
@@ -91,90 +71,71 @@ export default function Map({
 
                 if (!mapContainerRef.current) return;
 
+                // Compute initial center/zoom here so window is always available
+                const isMobile = window.innerWidth < 768;
+                const center: [number, number] = userPos && isUserInPisa(userPos)
+                    ? [userPos[1], userPos[0]]
+                    : isMobile
+                        ? [10.391578, 43.718735]
+                        : [10.395310, 43.716592];
+
                 mapRef.current = new mapboxModule.Map({
                     style: "mapbox://styles/giuliocape/cm2n7u82b003701piec8z517h",
                     container: mapContainerRef.current,
-                    center: center,
-                    zoom: zoom,
-                    pitch: pitch,
+                    center,
+                    zoom: 16,
+                    pitch: 69.97,
                 });
 
-                // Gestisce il movimento della mappa
-                if (mapRef.current) {
-                    mapRef.current.on("move", () => {
-                        if (mapRef.current) {
-                            const mapCenter = mapRef.current.getCenter();
-                            const mapZoom = mapRef.current.getZoom();
-                            const mapPitch = mapRef.current.getPitch();
-
-                            setCenter([mapCenter.lng, mapCenter.lat]);
-                            setZoom(mapZoom);
-                            setPitch(mapPitch);
-                        }
-                    });
-                }
-
-                 // Define bounds
-                 const bounds = new mapboxModule.LngLatBounds(
-                    [10.3789,43.7067], // Southwest coordinates [lng, lat]
-                    [10.4185,43.7257] // Northeast coordinates [lng, lat]
+                const bounds = new mapboxModule.LngLatBounds(
+                    [10.3789, 43.7067],
+                    [10.4185, 43.7257]
                 );
-                // Set the map's max bounds.
-                if (mapRef.current) {
-                    mapRef.current.setMaxBounds(bounds);
-                }
+                mapRef.current.setMaxBounds(bounds);
 
-                // Aggiungi i marker sulla mappa
                 if (typeof data === 'object' && data !== null) {
                     Object.entries(data).forEach(([buildingCode, building]) => {
-                const el = document.createElement("div");
-                el.className = "relative";
+                        const el = document.createElement("div");
+                        el.className = "relative";
 
-                const markerCircle = document.createElement("div");
-                markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean, building.buildingAvailableSoon as boolean);
-                el.appendChild(markerCircle);
+                        const markerCircle = document.createElement("div");
+                        markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean, building.buildingAvailableSoon as boolean);
+                        el.appendChild(markerCircle);
 
-                const label = document.createElement("div");
-                label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded";
-                label.innerText = buildingCode.replace("polo", "Polo ");
-                el.appendChild(label);
+                        const label = document.createElement("div");
+                        label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded";
+                        label.innerText = buildingCode.replace("polo", "Polo ");
+                        el.appendChild(label);
 
-                el.addEventListener("click", () => {
-                    if (!building.isClosed) {
-                        const accordionItem = document.getElementById(buildingCode);
-                        setTimeout(() => {
-                            if (accordionItem) {
-                                accordionItem.scrollIntoView({
-                                    behavior: "smooth",
-                                    block: "start",
-                                });
+                        el.addEventListener("click", () => {
+                            if (!building.isClosed) {
+                                const accordionItem = document.getElementById(buildingCode);
+                                setTimeout(() => {
+                                    if (accordionItem) {
+                                        accordionItem.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    }
+                                }, 300);
+                                handleMarkerClick(buildingCode);
                             }
-                        }, 300);
-                        handleMarkerClick(buildingCode);
-                    }
-                });
+                        });
 
-                if (mapRef.current && building.coordinates) {
-                    new mapboxModule.Marker(el)
-                        .setLngLat(building.coordinates as [number, number])
+                        if (mapRef.current && building.coordinates) {
+                            new mapboxModule.Marker(el)
+                                .setLngLat(building.coordinates as [number, number])
+                                .addTo(mapRef.current);
+                        }
+                    });
+                } else {
+                    console.error("Data is not an object:", data);
+                }
+
+                if (userPos && mapRef.current) {
+                    const e2 = document.createElement("div");
+                    e2.className = "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
+                    new mapboxModule.Marker(e2)
+                        .setLngLat([userPos[1], userPos[0]])
                         .addTo(mapRef.current);
                 }
-            });
-        } else {
-            console.error("Data is not an object:", data);
-        }
-
-        // Aggiungi il marker per la posizione dell'utente
-        if (userPos && mapRef.current) {
-            const e2 = document.createElement("div");
-            e2.className =
-                "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
-
-            new mapboxModule.Marker(e2)
-                .setLngLat([userPos[1], userPos[0]])
-                .addTo(mapRef.current);
-        }
-
             } catch (error) {
                 console.error("Errore durante il caricamento della mappa:", error);
             }
@@ -194,7 +155,7 @@ export default function Map({
             <div
                 id="map-container"
                 ref={mapContainerRef}
-                className="opacity-100"
+                className="w-full h-full"
             />
             <div className="bg-[#18181b]/90 absolute bottom-10 left-2 sm:bottom-8 sm:left-0 flex flex-col gap-2 m-1 py-2.5 p-2 rounded-[16px]">
                 <div className="flex items-center gap-0">

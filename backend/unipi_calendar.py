@@ -1,4 +1,6 @@
 import re
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo  # Python 3.9+
 import io
@@ -6,12 +8,33 @@ import requests
 import csv
 import vercel_blob
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 
-files = {} # Contiene i calendari (scaricati all'avvio del backend)
-buildings_status =  {} # contiene lo stato degli edifici (aggiornato ogni volta che si chiama la funzione get_open_classrooms)
-usually_open_dict = {} # contiene le aule che sono di solito aperte (scaricato all'avvio del backend)
-pisa_timezone = ZoneInfo("Europe/Rome") 
+class Lesson(BaseModel):
+    professor: str
+    start: str
+    end: str
+
+
+class Room(BaseModel):
+    lessons: list[Lesson] = []
+    free: bool = False
+    roomAvailableSoon: bool = False
+
+
+class Building(BaseModel):
+    coordinates: list[float]
+    free: bool = False
+    buildingAvailableSoon: bool = False
+    isClosed: bool = False
+    rooms: dict[str, Room] = {}
+
+
+files: dict[str, str] = {}
+buildings_status: dict[str, Building] = {}
+usually_open_dict: dict[str, dict[str, dict[str, bool]]] = {}
+pisa_timezone = ZoneInfo("Europe/Rome")
 
 poli_calendar_ids = {
             'poloA': '63247d96e3772a0690e3bcb4',
@@ -63,28 +86,33 @@ def list_all_blobs():
 
 
 def upload_a_blob(file_name, file_content):
-    file_content_bytes = file_content.encode('utf-8')  # Codifica la stringa in bytes
-    resp = vercel_blob.put(file_name, file_content_bytes, {
-                "addRandomSuffix": "false",
-            })
-    print("Vercel response : ",resp,"\n")
+    try:
+        file_content_bytes = file_content.encode('utf-8')
+        resp = vercel_blob.put(file_name, file_content_bytes, {"addRandomSuffix": "false", "allowOverwrite": "true"})
+        print("Vercel response : ", resp, "\n")
+    except Exception as e:
+        print(f"Blob upload skipped ({file_name}): {e}")
 
 
 def download_file_from_vercelFS(filename):
-    blobs = list_all_blobs()
+    try:
+        blobs = vercel_blob.list({'prefix': filename, 'limit': '1'})
+    except Exception as e:
+        print(f"Blob unavailable, skipping {filename}: {e}")
+        return None
     for blob in blobs['blobs']:
         if blob['pathname'] == filename:
             response = requests.get(blob['url'])
             if response.status_code == 200:
                 content = response.content.decode('utf-8')
                 print(f"{filename} caricato in memoria con successo.")
-                #print(content)
-                if content != None and content != "":
+                if content:
                     return content
             else:
                 print(f"Errore nel download di {filename}: {response.status_code}")
-                return
+                return None
     print(f"File {filename} non trovato su VercelFS.")
+    return None
 
 
 def delete_blob_by_filename(filename):
@@ -102,87 +130,63 @@ def delete_blob_by_filename(filename):
 # ----------------------------- functions to interact with the university of Pisa APIs ------------------------------------------------- #
 
 
-def get_unipi_calendars():
-    global poli_calendar_ids
-
-    # url iniziale per ottenere id del calendario
+def _fetch_polo_calendar(polo):
+    """Fetch and return (filename, ics_content) for a single polo, or None on error."""
     url_filtro = "https://unipi.prod.up.cineca.it/api/FiltriICal/creaFiltroICal"
     url_filtro_farmacia = "https://unich.prod.up.cineca.it/api/FiltriICal/creaFiltroICal"
-
-    # URL base per ottenere gli impegni, da concatenare con l'id ricevuto
     base_url = "https://unipi.prod.up.cineca.it:443/api/FiltriICal/impegniICal?id="
     base_url_farmacia = "https://unich.prod.up.cineca.it/api/FiltriICal/impegniICal?id="
 
-    
+    headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "Accept": "application/json, text/plain, */*",
+    }
 
-    for polo in poli_calendar_ids:
-        # Esegui la prima richiesta per ottenere l'ID
-        headers = {
-            "Content-Type": "application/json;charset=UTF-8",
-            "Accept": "application/json, text/plain, */*",
-        }
+    today = datetime.now(pisa_timezone).date()
+    today_str = today.strftime("%Y-%m-%d")
+    dataDa = (today - timedelta(days=1)).strftime("%Y-%m-%d") + "T22:00:00.000Z"
+    dataA = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T22:59:59.999Z"
+    dataScadenza = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T23:00:00.000Z"
 
-       
-        # Ottieni la data di oggi in formato UTC
-        today = datetime.now(pisa_timezone).date()
-
-        # Crea le date esatte come descritto
-        dataDa = (today - timedelta(days=1)).strftime("%Y-%m-%d") + "T22:00:00.000Z"
-        dataA = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T22:59:59.999Z"
-        dataScadenza = (today + timedelta(days=1)).strftime("%Y-%m-%d") + "T23:00:00.000Z"
-
-        # Payload per la richiesta
-
-        if polo == 'poloFarmacia':
-            data = {
+    if polo == 'poloFarmacia':
+        payload = {
             "clienteId": "5a65a9ebd9fe4f6d0ccf9df6",
-            "dataA": dataA,
-            "dataDa": dataDa,
-            "dataScadenza": dataScadenza,
+            "dataA": dataA, "dataDa": dataDa, "dataScadenza": dataScadenza,
             "linkCalendarioId": poli_calendar_ids[polo],
-            }
-        else:
-            data = {
+        }
+        url_id = url_filtro_farmacia
+        base = base_url_farmacia
+    else:
+        payload = {
             "clienteId": "628de8b9b63679f193b87046",
-            "dataA": dataA,
-            "dataDa": dataDa,
-            "dataScadenza": dataScadenza,
+            "dataA": dataA, "dataDa": dataDa, "dataScadenza": dataScadenza,
             "linkCalendarioId": poli_calendar_ids[polo],
-            }
-            
+        }
+        url_id = url_filtro
+        base = base_url
 
-        # Effettua la chiamata POST per ottenere l'ID
-        url_id = url_filtro_farmacia if polo == 'poloFarmacia' else url_filtro
-        response = requests.post(url_id, headers=headers, json=data)
-        
+    response = requests.post(url_id, headers=headers, json=payload)
+    if response.status_code != 200:
+        print(f"Errore nella creazione del filtro per {polo}: {response.status_code}\n{response.text}")
+        return None
 
-        if response.status_code == 200:
-            # Estrai l'ID dalla risposta
-            id_impegni = response.json().get("id")
-            
-            # Crea il link completo concatenando l'ID
-            if polo == 'poloFarmacia':
-                final_url = base_url_farmacia + id_impegni
-            else:
-                final_url = base_url + id_impegni
+    id_impegni = response.json().get("id")
+    response_impegni = requests.get(base + id_impegni, stream=True)
+    if response_impegni.status_code != 200:
+        print(f"Errore nel download del calendario per il polo {polo}: {response_impegni.status_code}")
+        return None
 
-            # Effettua la chiamata GET al link finale per scaricare il file
-            response_impegni = requests.get(final_url, stream=True)
-            
-            if response_impegni.status_code == 200:
-                # Aggiungi il file alla variabile globale
-                today = datetime.now(pisa_timezone).date()
-                # Converti today to string
-                today_str = today.strftime("%Y-%m-%d")
-                file_name = f"calendario_{polo}_{today_str}.ics"
-                file_content = response_impegni.text
-                # aggiungi il file e il suo contenuto alla variabile globale 
+    return f"calendario_{polo}_{today_str}.ics", response_impegni.text
+
+
+def get_unipi_calendars():
+    with ThreadPoolExecutor(max_workers=len(poli_calendar_ids)) as executor:
+        futures = {executor.submit(_fetch_polo_calendar, polo): polo for polo in poli_calendar_ids}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                file_name, file_content = result
                 files[file_name] = file_content
-            else:
-                print(f"Errore nel download del calendario per il polo "+polo+": {response_impegni.status_code}")
-        else:
-            print(f"Errore nella creazione del filtro: {response.status_code}")
-            print(response.text)
 
 
 
@@ -251,19 +255,16 @@ def parse_aule_csv(content):
     """
     Costruisce la variabile globale 'buildings_status' e 'usually_open_dict'  a partire dal contenuto del file 'aule.csv' scaricato da VercelFS.
     """
-    global buildings_status
-    global poli_coordinates
-    global usually_open_dict
-    
-    f = io.StringIO(content)  # Per trattare la stringa come se fosse un file
+    global buildings_status, poli_coordinates, usually_open_dict
+
+    f = io.StringIO(content)
     reader = csv.reader(f)
-    next(reader)  # Salta l'intestazione
+    next(reader)
     for row in reader:
         polo = row[0]
         location = row[1]
-        usually_open = row[2] == "True"  # Converte la stringa in booleano
+        usually_open = row[2] == "True"
 
-        # Aggiungi il polo e l'aula nella struttura 'usually_open_dict'
         if polo not in usually_open_dict:
             usually_open_dict[polo] = {}
         if location not in usually_open_dict[polo]:
@@ -271,18 +272,9 @@ def parse_aule_csv(content):
         usually_open_dict[polo][location]['usually_open'] = usually_open
 
         if polo not in buildings_status:
-            buildings_status[polo] = {}
-            # Aggiungi le coordinate del polo
-            buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            # Aggiungi la chiave 'free' e 'availableSoon' per il polo
-            buildings_status[polo]['free'] = False
-            buildings_status[polo]['buildingAvailableSoon'] = False
-        
-        # Crea la struttura per l'aula nel polo
-        buildings_status[polo][location] = {
-            'lessons': [],
-            'free': usually_open
-        }
+            buildings_status[polo] = Building(coordinates=poli_coordinates[polo])
+
+        buildings_status[polo].rooms[location] = Room(free=usually_open)
 
     f.close()
 
@@ -298,54 +290,72 @@ def parse_and_adjust_time(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def load_calendars_and_parse():
-    global poli_calendar_ids
-    global poli_coordinates
+LESSON_CACHE_FILENAME = "lessons_cache.json"
 
-    # se poli_calendar_ids non ha lo stesso numero di elementi di poli_coordinates, esce
+
+def load_calendars_and_parse():
+    global poli_calendar_ids, poli_coordinates, files, buildings_status, usually_open_dict
+
     if len(poli_calendar_ids) != len(poli_coordinates):
         print("Errore: poli_calendar_ids e poli_coordinates non hanno lo stesso numero di elementi.")
         return
 
-    get_unipi_calendars()
-    all_lessons = []  # Lista per accumulare tutte le lezioni    
-    # Itera sui nomi dei file .ics dalla variabile globale
-    for filename in files:
+    # Clear stale in-process state so a new-day refresh on a warm instance starts clean
+    files.clear()
+    buildings_status.clear()
+    usually_open_dict.clear()
 
-        # Ottengo il polo attuale dal filename
-        polo = filename.split('_')[1]  # Estrai il polo dal nome del file
-        # Parsare gli eventi
-        lessons = parse_ics(files[filename])
-        
-        # Aggiungi ad ogni lesson il polo
-        for lesson in lessons:
-            lesson['polo'] = polo
-
-        # Aggiungi le lezioni del file corrente alla lista totale
-        all_lessons.extend(lessons)
-    print("Calendari caricati con successo.")
     load_dotenv()
+
+    today_str = datetime.now(pisa_timezone).date().strftime("%Y-%m-%d")
+    all_lessons = None
+
+    # Try to load today's parsed lessons from Vercel Blob (avoids hitting UniPi on cold starts)
+    cached_json = download_file_from_vercelFS(LESSON_CACHE_FILENAME)
+    if cached_json:
+        try:
+            cached = json.loads(cached_json)
+            if cached.get("date") == today_str:
+                print("Lessons loaded from Vercel Blob cache.")
+                all_lessons = cached["lessons"]
+        except (json.JSONDecodeError, KeyError):
+            pass  # stale or corrupt cache, fall through to fetch
+
+    if all_lessons is None:
+        get_unipi_calendars()
+        all_lessons = []
+        for filename in files:
+            polo = filename.split('_')[1]
+            lessons = parse_ics(files[filename])
+            for lesson in lessons:
+                lesson['polo'] = polo
+            all_lessons.extend(lessons)
+        print("Calendari caricati con successo.")
+        upload_a_blob(LESSON_CACHE_FILENAME, json.dumps({"date": today_str, "lessons": all_lessons}))
+
     aule_csv_content = download_file_from_vercelFS("aule.csv")
-    if aule_csv_content != None and aule_csv_content != "":
+    if aule_csv_content:
         parse_aule_csv(aule_csv_content)
-            
+    else:
+        # aule.csv unavailable (no Blob token): pre-seed all buildings from coordinates
+        # so the map always shows every polo regardless of whether it has lessons today.
+        for polo in poli_coordinates:
+            buildings_status[polo] = Building(coordinates=poli_coordinates[polo])
+
     initialize_buildings_status(all_lessons)
     buildings_to_csv()
-    
-    return all_lessons  # Restituisci tutte le lezioni accumulate
+
+    return all_lessons
 
 
 def initialize_buildings_status(lessons):
     """
     Aggiorna la variabile globale `buildings_status` con lo stato attuale degli edifici.
     """
-    global poli_coordinates
-    global buildings_status
-
+    global poli_coordinates, buildings_status
 
     now = datetime.now(pisa_timezone)
-    
-    # Itera su tutte le lezioni
+
     for lesson in lessons:
         polo = lesson['polo']
         if is_building_closed(polo, now):
@@ -355,88 +365,56 @@ def initialize_buildings_status(lessons):
         start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
         end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
 
-        # Crea la struttura per il polo se non esiste già
         if polo not in buildings_status:
-            buildings_status[polo] = {}
-            # aggiungi le coordinate del polo
-            buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            buildings_status[polo]['buildingAvailableSoon'] = False
+            buildings_status[polo] = Building(coordinates=poli_coordinates[polo])
 
-            
-        # Crea la struttura per l'aula se non esiste già
-        if location not in buildings_status[polo]:
-            buildings_status[polo][location] = {
-                'lessons': [],  # Lezioni future o in corso
-                'free': True,    # Presume l'aula libera fino a prova contraria
-                'roomAvailableSoon': False  # Presume l'aula non disponibile a breve fino a prova contraria
-            }
-        
-        # Confronta l'orario per selezionare lezioni future o in corso oggi
+        if location not in buildings_status[polo].rooms:
+            buildings_status[polo].rooms[location] = Room(free=True)
+            # If aule.csv wasn't loaded, treat rooms found in lesson data as usually open
+            usually_open_dict.setdefault(polo, {}).setdefault(location, {'usually_open': True})
+
         if start_time.date() == now.date() and end_time > now:
-            if lesson['professor'] != "No description" and len(lesson['professor']) > 0:
-                # rimuovi '\nNOTE:' e tutto ciò che segue da 'lesson['professor']
-                lesson['professor'] = lesson['professor'].split("\\nNOTE")[0]
-                # rimuovi tutte le '\' da 'lesson['professor']
-                lesson['professor'] = lesson['professor'].replace("\\", "")
-                lesson['professor'] = lesson['professor'].replace(" \\(.*?\\)", "")
-                # Divide i nomi separati da virgola
-                cleaned_professors_list = lesson['professor'].split(",")
-            
-                # Rimuove caratteri indesiderati e formatta i nomi
+            professor = lesson['professor']
+            if professor != "No description" and len(professor) > 0:
+                professor = professor.split("\\nNOTE")[0]
+                professor = professor.replace("\\", "")
+                professor = professor.replace(" \\(.*?\\)", "")
+                cleaned_professors_list = professor.split(",")
                 cleaned_professors_list = [
                     prof.strip().split(".")[-1].strip() if "." in prof else " ".join(prof.split()[:-1])
                     for prof in cleaned_professors_list
                 ]
-
-                # Unisce i nomi dei professori
                 cleaned_professors = ", ".join(cleaned_professors_list)
-            
-                # Limita a 70 caratteri
                 if len(cleaned_professors) <= 70:
-                    lesson['professor'] = cleaned_professors
-                    # mette tutti i nomi in uppercase
-                    lesson['professor'] = lesson['professor'].upper()
+                    professor = cleaned_professors.upper()
                 else:
-                    lesson['professor'] = 'No description'
+                    professor = 'No description'
             else:
-                lesson['professor'] = 'No description'
+                professor = 'No description'
 
-            buildings_status[polo][location]['lessons'].append({
-                'professor': lesson['professor'],
-                'start': start_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'end': end_time.strftime('%Y-%m-%d %H:%M:%S'),
-            })
-            
-            
-            # Se c'è una lezione in corso al momento, l'aula non è libera
+            buildings_status[polo].rooms[location].lessons.append(Lesson(
+                professor=professor,
+                start=start_time.strftime('%Y-%m-%d %H:%M:%S'),
+                end=end_time.strftime('%Y-%m-%d %H:%M:%S'),
+            ))
+
             if start_time <= now <= end_time:
-                buildings_status[polo][location]['free'] = False
+                buildings_status[polo].rooms[location].free = False
 
-            # Se la lezione finisce entro 30 minuti, setto il campo 'availableSoon' a True. Come ne trovo una significa che anche il polo è disponibile a breve
             if end_time - now <= timedelta(minutes=30):
-                buildings_status[polo][location]['roomAvailableSoon'] = True
-                buildings_status[polo]['buildingAvailableSoon'] = True
-    
-    for polo in buildings_status:
-        if is_building_closed(polo, now):
-            buildings_status[polo]['isClosed'] = True
-            buildings_status[polo]['free'] = False
-            buildings_status[polo]['buildingAvailableSoon'] = False
-            continue
-        else:
-            buildings_status[polo]['isClosed'] = False
-            buildings_status[polo]['free'] = False
-            buildings_status[polo]['buildingAvailableSoon'] = False
+                buildings_status[polo].rooms[location].roomAvailableSoon = True
+                buildings_status[polo].buildingAvailableSoon = True
 
-        # Imposta inizialmente il polo come non libero e non disponibile a breve
-        is_building_free = False
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
-                if buildings_status[polo][location]['free'] == True:
-                    is_building_free = True
-                    break
-        
-        buildings_status[polo]['free'] = is_building_free
+    for polo, building in buildings_status.items():
+        if is_building_closed(polo, now):
+            building.isClosed = True
+            building.free = False
+            building.buildingAvailableSoon = False
+            continue
+
+        building.isClosed = False
+        building.buildingAvailableSoon = False
+        building.free = any(room.free for room in building.rooms.values())
 
     return buildings_status
 
@@ -453,66 +431,50 @@ def get_buildings_status():
     Aggiorna e restituisce lo stato attuale degli edifici.
     """
     global buildings_status
-    # scorre buildings_status e rimuove le lezioni che sono terminate. Setta:
-    # - il campo free della location a True se non ci sono lezioni in corso in questo momento
-    # - il campo free del polo a True se c'è almeno una location libera
-    # - il campo roomAvailableSoon della location a True se la location sarà libera entro 30 minuti
-    # - il campo buildingAvailableSoon del polo a True se c'è almeno una location che sarà libera entro 30 minuti
     now = datetime.now(pisa_timezone)
-    for polo in buildings_status:
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
-                # Rimuovi le lezioni terminate
-                buildings_status[polo][location]['lessons'] = [lesson for lesson in buildings_status[polo][location]['lessons']
-                                                               if datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now]
 
-                if not is_usually_open(polo, location):
-                    buildings_status[polo][location]['free'] = False
-                    buildings_status[polo][location]['roomAvailableSoon'] = False
-                    continue
-                
-                # Imposta inizialmente l'aula come libera
-                buildings_status[polo][location]['free'] = True
-                buildings_status[polo][location]['roomAvailableSoon'] = False
+    for polo, building in buildings_status.items():
+        # Recompute isClosed on every call so it reflects the current time,
+        # not the time the server started.
+        if is_building_closed(polo, now):
+            building.isClosed = True
+            building.free = False
+            building.buildingAvailableSoon = False
+            continue
 
-                # Se l'aula ha almeno una lezione in corso, non è libera
-                for lesson in buildings_status[polo][location]['lessons']:
-                    start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
-                    end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
-                    # Controlla se la lezione è in corso
-                    if start_time <= now <= end_time:
-                        buildings_status[polo][location]['free'] = False
+        building.isClosed = False
 
-                        # Verifica se la lezione finisce entro 30 minuti
-                        if end_time - now <= timedelta(minutes=30):
-                            # Controlla se c'è un'altra lezione che inizia esattamente quando termina la lezione corrente
-                            # oppure se inizia 15 minuti dopo la fine della lezione corrente
-                            next_lesson_exists = any(
-                                datetime.strptime(next_lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) in {end_time, end_time + timedelta(minutes=15)}
-                                for next_lesson in buildings_status[polo][location]['lessons']
-                                )
+        for location, room in building.rooms.items():
+            room.lessons = [
+                lesson for lesson in room.lessons
+                if datetime.strptime(lesson.end, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now
+            ]
 
-                            # Se non c'è un'altra lezione che inizia quando termina l'attuale, setta 'availableSoon' a True
-                            if not next_lesson_exists:
-                                buildings_status[polo][location]['roomAvailableSoon'] = True
-        
+            if not is_usually_open(polo, location):
+                room.free = False
+                room.roomAvailableSoon = False
+                continue
 
-        # Se il polo ha almeno una aula liberata, il polo è considerato libero
-        buildings_status[polo]['free'] = False
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free','isClosed']:
-                if buildings_status[polo][location]['free'] == True:
-                    buildings_status[polo]['free'] = True
-                    break
-    
-        # se il polo ha almeno una aula che sarà libera entro 30 minuti, il polo è considerato disponibile a breve
-        buildings_status[polo]['buildingAvailableSoon'] = False
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
-                if buildings_status[polo][location]['roomAvailableSoon'] == True:
-                    buildings_status[polo]['buildingAvailableSoon'] = True
-                    break
-    
+            room.free = True
+            room.roomAvailableSoon = False
+
+            for lesson in room.lessons:
+                start_time = datetime.strptime(lesson.start, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                end_time = datetime.strptime(lesson.end, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                if start_time <= now <= end_time:
+                    room.free = False
+                    if end_time - now <= timedelta(minutes=30):
+                        next_lesson_exists = any(
+                            datetime.strptime(nl.start, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                            in {end_time, end_time + timedelta(minutes=15)}
+                            for nl in room.lessons
+                        )
+                        if not next_lesson_exists:
+                            room.roomAvailableSoon = True
+
+        building.free = any(room.free for room in building.rooms.values())
+        building.buildingAvailableSoon = any(room.roomAvailableSoon for room in building.rooms.values())
+
     return buildings_status
 
 

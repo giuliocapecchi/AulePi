@@ -84,16 +84,14 @@ export default function Left({
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="divide-y divide-dashed divide-zinc-600">
-                                    {Object.entries(building)
-                                        .filter(([roomNumber, room]) => typeof room !== "boolean" && !Array.isArray(room)) // Filtra solo le stanze
+                                    {Object.entries(building.rooms)
                                         .sort(([, a], [, b]) => {
-                                            // Ordinamento per: free (true) -> roomAvailableSoon (true) -> free (false)
-                                            if (a.free && !b.free) return -1; // a precede b
-                                            if (!a.free && b.free) return 1; // b precede a
-                                            if (a.roomAvailableSoon && !b.roomAvailableSoon) return -1; // a precede b
-                                            if (!a.roomAvailableSoon && b.roomAvailableSoon) return 1; // b precede a
-                                            return 0; // Nessun cambiamento
-                                        }) // Ordina per mettere le stanze libere in cima
+                                            if (a.free && !b.free) return -1;
+                                            if (!a.free && b.free) return 1;
+                                            if (a.roomAvailableSoon && !b.roomAvailableSoon) return -1;
+                                            if (!a.roomAvailableSoon && b.roomAvailableSoon) return 1;
+                                            return 0;
+                                        })
                                         .map(([roomNumber, room]) => (
                                             <div
                                                 key={roomNumber}
@@ -140,59 +138,81 @@ export default function Left({
                     })}
             </Accordion>
             <button
-                className="bg-arno text-white py-1 px-2 rounded mb-3 mt-4 text-sm"
                 onClick={() => setShowCredits(true)}
+                className="mt-6 mb-3 text-xs tracking-widest uppercase text-zinc-500 hover:text-zinc-300 transition-colors duration-200 font-[family-name:var(--font-geist-mono)]"
             >
-                About this project
+                about
             </button>
             {showCredits && (
-                <Modal onClose={() => setShowCredits(false)}>
-                    <div className="space-y-6">
-
-                        <div>
-                            <h2 className="text-lg md:text-2xl font-semibold">About this Project</h2>
-                            <p className="text-sm md:text-base leading-relaxed">Welcome to AulePi, a website where you can find available classes for all the University of Pisa buildings! The platform is designed to provide students with quick information on classroom availability. Whether you are looking for a quiet place to study or a classroom for your next lecture, AulePi has you covered.</p>
-                        </div>
-
-                        <div>
-                            <h2 className="text-lg md:text-2xl font-semibold">Features</h2>
-                            <p className="text-sm md:text-base leading-relaxed">The application tries to be user-friendly and straightforward. One hidden feature is although present: you can click on the building&apos;s markers on the map, and this will redirect you to their current time schedule.</p>
-                        </div>
-
-                        <div>
-                            <h2 className="text-lg md:text-2xl font-semibold">How does this work?</h2>
-                            <p className="text-sm md:text-base leading-relaxed">AulePi aggregates data from the University of Pisa&apos;s scheduling systems, ensuring that you receive accurate and up-to-date information each time you load the page: if you encounter outdated information, simply refresh the page to retrieve the latest updates. For more in-depth details, check out the <a href="https://github.com/giuliocapecchi/AulePi" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">GitHub repository</a> for this project.</p>
-                        </div>
-
-                        <div>
-                            <h2 className="text-lg md:text-2xl font-semibold">Who Am I</h2>
-                            <p className="text-sm md:text-base leading-relaxed">I am <a href="https://www.linkedin.com/in/giulio-capecchi/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Giulio Capecchi</a>, a student currently enrolled in the Master&apos;s program (AIDE) at the University of Pisa. With AulePi, my aim was to create a valuable resource for my fellow students, facilitating the search for available classrooms. I hope you find this website helpful in your studies! If you have any feedback or suggestions, feel free to reach out to me on <a href="https://github.com/giuliocapecchi" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">GitHub</a> or via <a href="mailto:giuliocapecchi2000@gmail.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">email</a>.</p>
-                        </div>
-                        <div>
-                            <h2 className="text-lg md:text-2xl font-semibold">Disclaimer</h2>
-                            <p className="text-sm md:text-base leading-relaxed">
-                                Please note that while AulePi strives to provide accurate and up-to-date information, the information provided may change without notice. AulePi&apos;s mainteners shall not be held liable for any discrepancies or issues arising from the use of this application.
-                            </p>
-                        </div>
-
-                    </div>
-                </Modal>
+                <AboutModal onClose={() => setShowCredits(false)} />
             )}
         </div>
     );
 }
 
-function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode; }) {
+function AboutModal({ onClose }: { onClose: () => void }) {
     return (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-zinc-900/80 rounded-lg p-6 max-w-lg sm:max-w-xl w-full max-h-screen mx-4  relative overflow-y-auto">
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-red-800 hover:text-red-600 font-bold"
-                >
-                    X
-                </button>
-                {children}
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+            onClick={onClose}
+        >
+            <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden shadow-2xl"
+                style={{ animation: "aboutIn 0.2s ease-out both" }}
+            >
+                <style>{`
+                    @keyframes aboutIn {
+                        from { opacity: 0; transform: translateY(8px); }
+                        to   { opacity: 1; transform: translateY(0); }
+                    }
+                    .alink { color: #7fa8c9; text-decoration: underline; text-underline-offset: 3px; }
+                    .alink:hover { color: #a8c8e0; }
+                `}</style>
+
+                {/* Top bar */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                    <span className="text-xs tracking-widest uppercase text-zinc-400 font-[family-name:var(--font-geist-mono)]">
+                        about
+                    </span>
+                    <button
+                        onClick={onClose}
+                        className="text-zinc-500 hover:text-zinc-200 transition-colors text-xs tracking-widest uppercase font-[family-name:var(--font-geist-mono)]"
+                    >
+                        esc
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="px-5 py-5 space-y-5 text-sm text-zinc-400 leading-relaxed">
+                    <p>
+                        <span className="text-zinc-200 font-medium">AulePi</span> shows real-time classroom availability across all University of Pisa buildings. Find a free room in seconds, on the map or in the list.
+                    </p>
+
+                    <div className="border-t border-zinc-800 pt-5">
+                        <p className="text-xs uppercase tracking-widest text-zinc-500 font-[family-name:var(--font-geist-mono)] mb-2">how it works</p>
+                        <p>
+                            Data is fetched live from UniPi&apos;s scheduling APIs on each page load. Clicking a building marker on the map jumps to its schedule. Refresh to get the latest updates.
+                        </p>
+                    </div>
+
+                    <div className="border-t border-zinc-800 pt-5">
+                        <p className="text-xs uppercase tracking-widest text-zinc-500 font-[family-name:var(--font-geist-mono)] mb-2">author</p>
+                        <p>
+                            Built by{" "}
+                            <a href="https://www.linkedin.com/in/giulio-capecchi/" target="_blank" rel="noopener noreferrer" className="alink">Giulio Capecchi</a>
+                            , Master&apos;s student in AIDE at UniPi. Contributions and feedback welcome on{" "}
+                            <a href="https://github.com/giuliocapecchi/AulePi" target="_blank" rel="noopener noreferrer" className="alink">GitHub</a>
+                            {" "}or by <a href="mailto:giuliocapecchi2000@gmail.com" className="alink">email</a>.
+                        </p>
+                    </div>
+
+                    <div className="border-t border-zinc-800 pt-5">
+                        <p className="text-[11px] text-zinc-600 leading-relaxed">
+                            Schedules may change without notice. Use this as a guide, not a guarantee.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     );
