@@ -1,8 +1,23 @@
 "use client";
 import React, { useRef, useEffect, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
 import { BuildingData } from "@/types/interfaces";
+
+let mapboxgl: any = null;
+
+// dynamically load Mapbox GL JS and its CSS
+const loadMapboxGL = async () => {
+    if (!mapboxgl) {
+        const mapboxModule = await import('mapbox-gl');
+        mapboxgl = mapboxModule.default;
+        if (typeof document !== 'undefined') {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css';
+            document.head.appendChild(link);
+        }
+    }
+    return mapboxgl;
+};
 
 export default function Map({
     data,
@@ -62,45 +77,56 @@ export default function Map({
     }
 
     useEffect(() => {
-        if (mapboxToken) {
-            mapboxgl.accessToken = mapboxToken;
-        } else {
-            console.error("Mapbox token is not defined");
-        }
+        const initializeMap = async () => {
+            try {
+                // load Mapbox GL asynchronously
+                const mapboxModule = await loadMapboxGL();
+                
+                if (mapboxToken) {
+                    mapboxModule.accessToken = mapboxToken;
+                } else {
+                    console.error("Mapbox token is not defined");
+                    return;
+                }
 
-        mapRef.current = new mapboxgl.Map({
-            style: "mapbox://styles/giuliocape/cm2n7u82b003701piec8z517h",
-            container: mapContainerRef.current as HTMLElement,
-            center: center,
-            zoom: zoom,
-            pitch: pitch,
-        });
+                if (!mapContainerRef.current) return;
 
-        // Gestisce il movimento della mappa
-        mapRef.current.on("move", () => {
-            if (mapRef.current) {
-                const mapCenter = mapRef.current.getCenter();
-                const mapZoom = mapRef.current.getZoom();
-                const mapPitch = mapRef.current.getPitch();
+                mapRef.current = new mapboxModule.Map({
+                    style: "mapbox://styles/giuliocape/cm2n7u82b003701piec8z517h",
+                    container: mapContainerRef.current,
+                    center: center,
+                    zoom: zoom,
+                    pitch: pitch,
+                });
 
-                setCenter([mapCenter.lng, mapCenter.lat]);
-                setZoom(mapZoom);
-                setPitch(mapPitch);
-            }
-        });
+                // Gestisce il movimento della mappa
+                if (mapRef.current) {
+                    mapRef.current.on("move", () => {
+                        if (mapRef.current) {
+                            const mapCenter = mapRef.current.getCenter();
+                            const mapZoom = mapRef.current.getZoom();
+                            const mapPitch = mapRef.current.getPitch();
 
-         // Define bounds
-         const bounds = new mapboxgl.LngLatBounds(
-            [10.3789,43.7067], // Southwest coordinates [lng, lat]
-            [10.4185,43.7257] // Northeast coordinates [lng, lat]
-        );
-        // Set the map's max bounds.
-        mapRef.current.setMaxBounds(bounds);
+                            setCenter([mapCenter.lng, mapCenter.lat]);
+                            setZoom(mapZoom);
+                            setPitch(mapPitch);
+                        }
+                    });
+                }
 
+                 // Define bounds
+                 const bounds = new mapboxModule.LngLatBounds(
+                    [10.3789,43.7067], // Southwest coordinates [lng, lat]
+                    [10.4185,43.7257] // Northeast coordinates [lng, lat]
+                );
+                // Set the map's max bounds.
+                if (mapRef.current) {
+                    mapRef.current.setMaxBounds(bounds);
+                }
 
-        // Aggiungi i marker sulla mappa
-        if (typeof data === 'object' && data !== null) {
-            Object.entries(data).forEach(([buildingCode, building]) => {
+                // Aggiungi i marker sulla mappa
+                if (typeof data === 'object' && data !== null) {
+                    Object.entries(data).forEach(([buildingCode, building]) => {
                 const el = document.createElement("div");
                 el.className = "relative";
 
@@ -129,7 +155,7 @@ export default function Map({
                 });
 
                 if (mapRef.current && building.coordinates) {
-                    new mapboxgl.Marker(el)
+                    new mapboxModule.Marker(el)
                         .setLngLat(building.coordinates as [number, number])
                         .addTo(mapRef.current);
                 }
@@ -139,15 +165,22 @@ export default function Map({
         }
 
         // Aggiungi il marker per la posizione dell'utente
-        if (userPos) {
+        if (userPos && mapRef.current) {
             const e2 = document.createElement("div");
             e2.className =
                 "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
 
-            new mapboxgl.Marker(e2)
+            new mapboxModule.Marker(e2)
                 .setLngLat([userPos[1], userPos[0]])
                 .addTo(mapRef.current);
         }
+
+            } catch (error) {
+                console.error("Errore durante il caricamento della mappa:", error);
+            }
+        };
+
+        initializeMap();
 
         return () => {
             if (mapRef.current) {
