@@ -86,15 +86,20 @@ def list_all_blobs():
 
 
 def upload_a_blob(file_name, file_content):
-    file_content_bytes = file_content.encode('utf-8')  # Codifica la stringa in bytes
-    resp = vercel_blob.put(file_name, file_content_bytes, {
-                "addRandomSuffix": "false",
-            })
-    print("Vercel response : ",resp,"\n")
+    try:
+        file_content_bytes = file_content.encode('utf-8')
+        resp = vercel_blob.put(file_name, file_content_bytes, {"addRandomSuffix": "false"})
+        print("Vercel response : ", resp, "\n")
+    except Exception as e:
+        print(f"Blob upload skipped ({file_name}): {e}")
 
 
 def download_file_from_vercelFS(filename):
-    blobs = vercel_blob.list({'prefix': filename, 'limit': '1'})
+    try:
+        blobs = vercel_blob.list({'prefix': filename, 'limit': '1'})
+    except Exception as e:
+        print(f"Blob unavailable, skipping {filename}: {e}")
+        return None
     for blob in blobs['blobs']:
         if blob['pathname'] == filename:
             response = requests.get(blob['url'])
@@ -331,6 +336,11 @@ def load_calendars_and_parse():
     aule_csv_content = download_file_from_vercelFS("aule.csv")
     if aule_csv_content:
         parse_aule_csv(aule_csv_content)
+    else:
+        # aule.csv unavailable (no Blob token): pre-seed all buildings from coordinates
+        # so the map always shows every polo regardless of whether it has lessons today.
+        for polo in poli_coordinates:
+            buildings_status[polo] = Building(coordinates=poli_coordinates[polo])
 
     initialize_buildings_status(all_lessons)
     buildings_to_csv()
@@ -360,6 +370,8 @@ def initialize_buildings_status(lessons):
 
         if location not in buildings_status[polo].rooms:
             buildings_status[polo].rooms[location] = Room(free=True)
+            # If aule.csv wasn't loaded, treat rooms found in lesson data as usually open
+            usually_open_dict.setdefault(polo, {}).setdefault(location, {'usually_open': True})
 
         if start_time.date() == now.date() and end_time > now:
             professor = lesson['professor']
