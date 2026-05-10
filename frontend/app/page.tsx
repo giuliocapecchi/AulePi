@@ -89,11 +89,9 @@ export default function Home() {
         fetchLocationAndData();
     }, []);
 
-    if (loading) {
-        return <Loading fadeOut={fadeOut}  />;
-    }
-
     return (
+        <>
+        {loading && <Loading fadeOut={fadeOut} />}
         <main className="flex flex-col sm:flex-row sm:gap-4 h-screen">
             <div className="basis-2/5 sm:h-full order-last sm:order-first py-4 sm:px-0 sm:py-2 flex flex-col">
                 <div className="w-full h-20 pl-8 pr-4 flex justify-between items-center space-x-2">
@@ -104,6 +102,7 @@ export default function Home() {
                         sizes="100vw"
                         style={{ width: 'auto', height: '93%' }}
                         alt="Logo"
+                        priority
                     />
                     <Alert className="h-fit text-pretty w-40">
                         <AlertDescription>
@@ -139,5 +138,6 @@ export default function Home() {
                 />
             </div>
         </main>
+        </>
     );
 }
