@@ -11,5 +11,6 @@
         "src": "/(.*)",
         "dest": "app.py"
       }
-    ]
+    ],
+    "ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ]"
   }
