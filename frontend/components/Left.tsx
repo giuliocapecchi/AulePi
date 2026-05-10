@@ -8,13 +8,9 @@ import {
 } from "@/components/ui/accordion";
 import { Lesson, BuildingData } from "@/types/interfaces";
 
-const errorData: BuildingData = { // Valori fittizi per il building in caso di errore
-    building: "Error",
-    building_code: "ERROR_CODE",
-    building_status: "Internal Server Error",
+const errorData: BuildingData = {
     rooms: {},
     coordinates: [0, 0],
-    distance: Infinity,
     free: false,
     isClosed: true,
     buildingAvailableSoon: false,

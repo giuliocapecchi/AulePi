@@ -91,7 +91,7 @@ export default function Map({
                     [10.3789, 43.7067],
                     [10.4185, 43.7257]
                 );
-                mapRef.current.setMaxBounds(bounds);
+                mapRef.current?.setMaxBounds(bounds);
 
                 if (typeof data === 'object' && data !== null) {
                     Object.entries(data).forEach(([buildingCode, building]) => {
