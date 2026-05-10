@@ -434,6 +434,16 @@ def get_buildings_status():
     now = datetime.now(pisa_timezone)
 
     for polo, building in buildings_status.items():
+        # Recompute isClosed on every call so it reflects the current time,
+        # not the time the server started.
+        if is_building_closed(polo, now):
+            building.isClosed = True
+            building.free = False
+            building.buildingAvailableSoon = False
+            continue
+
+        building.isClosed = False
+
         for location, room in building.rooms.items():
             room.lessons = [
                 lesson for lesson in room.lessons
