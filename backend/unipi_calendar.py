@@ -8,12 +8,33 @@ import requests
 import csv
 import vercel_blob
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 
-files = {} # Contiene i calendari (scaricati all'avvio del backend)
-buildings_status =  {} # contiene lo stato degli edifici (aggiornato ogni volta che si chiama la funzione get_open_classrooms)
-usually_open_dict = {} # contiene le aule che sono di solito aperte (scaricato all'avvio del backend)
-pisa_timezone = ZoneInfo("Europe/Rome") 
+class Lesson(BaseModel):
+    professor: str
+    start: str
+    end: str
+
+
+class Room(BaseModel):
+    lessons: list[Lesson] = []
+    free: bool = False
+    roomAvailableSoon: bool = False
+
+
+class Building(BaseModel):
+    coordinates: list[float]
+    free: bool = False
+    buildingAvailableSoon: bool = False
+    isClosed: bool = False
+    rooms: dict[str, Room] = {}
+
+
+files: dict[str, str] = {}
+buildings_status: dict[str, Building] = {}
+usually_open_dict: dict[str, dict[str, dict[str, bool]]] = {}
+pisa_timezone = ZoneInfo("Europe/Rome")
 
 poli_calendar_ids = {
             'poloA': '63247d96e3772a0690e3bcb4',
@@ -229,19 +250,16 @@ def parse_aule_csv(content):
     """
     Costruisce la variabile globale 'buildings_status' e 'usually_open_dict'  a partire dal contenuto del file 'aule.csv' scaricato da VercelFS.
     """
-    global buildings_status
-    global poli_coordinates
-    global usually_open_dict
-    
-    f = io.StringIO(content)  # Per trattare la stringa come se fosse un file
+    global buildings_status, poli_coordinates, usually_open_dict
+
+    f = io.StringIO(content)
     reader = csv.reader(f)
-    next(reader)  # Salta l'intestazione
+    next(reader)
     for row in reader:
         polo = row[0]
         location = row[1]
-        usually_open = row[2] == "True"  # Converte la stringa in booleano
+        usually_open = row[2] == "True"
 
-        # Aggiungi il polo e l'aula nella struttura 'usually_open_dict'
         if polo not in usually_open_dict:
             usually_open_dict[polo] = {}
         if location not in usually_open_dict[polo]:
@@ -249,18 +267,9 @@ def parse_aule_csv(content):
         usually_open_dict[polo][location]['usually_open'] = usually_open
 
         if polo not in buildings_status:
-            buildings_status[polo] = {}
-            # Aggiungi le coordinate del polo
-            buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            # Aggiungi la chiave 'free' e 'availableSoon' per il polo
-            buildings_status[polo]['free'] = False
-            buildings_status[polo]['buildingAvailableSoon'] = False
-        
-        # Crea la struttura per l'aula nel polo
-        buildings_status[polo][location] = {
-            'lessons': [],
-            'free': usually_open
-        }
+            buildings_status[polo] = Building(coordinates=poli_coordinates[polo])
+
+        buildings_status[polo].rooms[location] = Room(free=usually_open)
 
     f.close()
 
@@ -333,13 +342,10 @@ def initialize_buildings_status(lessons):
     """
     Aggiorna la variabile globale `buildings_status` con lo stato attuale degli edifici.
     """
-    global poli_coordinates
-    global buildings_status
-
+    global poli_coordinates, buildings_status
 
     now = datetime.now(pisa_timezone)
-    
-    # Itera su tutte le lezioni
+
     for lesson in lessons:
         polo = lesson['polo']
         if is_building_closed(polo, now):
@@ -349,88 +355,54 @@ def initialize_buildings_status(lessons):
         start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
         end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
 
-        # Crea la struttura per il polo se non esiste già
         if polo not in buildings_status:
-            buildings_status[polo] = {}
-            # aggiungi le coordinate del polo
-            buildings_status[polo]['coordinates'] = poli_coordinates[polo]
-            buildings_status[polo]['buildingAvailableSoon'] = False
+            buildings_status[polo] = Building(coordinates=poli_coordinates[polo])
 
-            
-        # Crea la struttura per l'aula se non esiste già
-        if location not in buildings_status[polo]:
-            buildings_status[polo][location] = {
-                'lessons': [],  # Lezioni future o in corso
-                'free': True,    # Presume l'aula libera fino a prova contraria
-                'roomAvailableSoon': False  # Presume l'aula non disponibile a breve fino a prova contraria
-            }
-        
-        # Confronta l'orario per selezionare lezioni future o in corso oggi
+        if location not in buildings_status[polo].rooms:
+            buildings_status[polo].rooms[location] = Room(free=True)
+
         if start_time.date() == now.date() and end_time > now:
-            if lesson['professor'] != "No description" and len(lesson['professor']) > 0:
-                # rimuovi '\nNOTE:' e tutto ciò che segue da 'lesson['professor']
-                lesson['professor'] = lesson['professor'].split("\\nNOTE")[0]
-                # rimuovi tutte le '\' da 'lesson['professor']
-                lesson['professor'] = lesson['professor'].replace("\\", "")
-                lesson['professor'] = lesson['professor'].replace(" \\(.*?\\)", "")
-                # Divide i nomi separati da virgola
-                cleaned_professors_list = lesson['professor'].split(",")
-            
-                # Rimuove caratteri indesiderati e formatta i nomi
+            professor = lesson['professor']
+            if professor != "No description" and len(professor) > 0:
+                professor = professor.split("\\nNOTE")[0]
+                professor = professor.replace("\\", "")
+                professor = professor.replace(" \\(.*?\\)", "")
+                cleaned_professors_list = professor.split(",")
                 cleaned_professors_list = [
                     prof.strip().split(".")[-1].strip() if "." in prof else " ".join(prof.split()[:-1])
                     for prof in cleaned_professors_list
                 ]
-
-                # Unisce i nomi dei professori
                 cleaned_professors = ", ".join(cleaned_professors_list)
-            
-                # Limita a 70 caratteri
                 if len(cleaned_professors) <= 70:
-                    lesson['professor'] = cleaned_professors
-                    # mette tutti i nomi in uppercase
-                    lesson['professor'] = lesson['professor'].upper()
+                    professor = cleaned_professors.upper()
                 else:
-                    lesson['professor'] = 'No description'
+                    professor = 'No description'
             else:
-                lesson['professor'] = 'No description'
+                professor = 'No description'
 
-            buildings_status[polo][location]['lessons'].append({
-                'professor': lesson['professor'],
-                'start': start_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'end': end_time.strftime('%Y-%m-%d %H:%M:%S'),
-            })
-            
-            
-            # Se c'è una lezione in corso al momento, l'aula non è libera
+            buildings_status[polo].rooms[location].lessons.append(Lesson(
+                professor=professor,
+                start=start_time.strftime('%Y-%m-%d %H:%M:%S'),
+                end=end_time.strftime('%Y-%m-%d %H:%M:%S'),
+            ))
+
             if start_time <= now <= end_time:
-                buildings_status[polo][location]['free'] = False
+                buildings_status[polo].rooms[location].free = False
 
-            # Se la lezione finisce entro 30 minuti, setto il campo 'availableSoon' a True. Come ne trovo una significa che anche il polo è disponibile a breve
             if end_time - now <= timedelta(minutes=30):
-                buildings_status[polo][location]['roomAvailableSoon'] = True
-                buildings_status[polo]['buildingAvailableSoon'] = True
-    
-    for polo in buildings_status:
-        if is_building_closed(polo, now):
-            buildings_status[polo]['isClosed'] = True
-            buildings_status[polo]['free'] = False
-            buildings_status[polo]['buildingAvailableSoon'] = False
-            continue
-        else:
-            buildings_status[polo]['isClosed'] = False
-            buildings_status[polo]['free'] = False
-            buildings_status[polo]['buildingAvailableSoon'] = False
+                buildings_status[polo].rooms[location].roomAvailableSoon = True
+                buildings_status[polo].buildingAvailableSoon = True
 
-        # Imposta inizialmente il polo come non libero e non disponibile a breve
-        is_building_free = False
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
-                if buildings_status[polo][location]['free'] == True:
-                    is_building_free = True
-                    break
-        
-        buildings_status[polo]['free'] = is_building_free
+    for polo, building in buildings_status.items():
+        if is_building_closed(polo, now):
+            building.isClosed = True
+            building.free = False
+            building.buildingAvailableSoon = False
+            continue
+
+        building.isClosed = False
+        building.buildingAvailableSoon = False
+        building.free = any(room.free for room in building.rooms.values())
 
     return buildings_status
 
@@ -447,66 +419,40 @@ def get_buildings_status():
     Aggiorna e restituisce lo stato attuale degli edifici.
     """
     global buildings_status
-    # scorre buildings_status e rimuove le lezioni che sono terminate. Setta:
-    # - il campo free della location a True se non ci sono lezioni in corso in questo momento
-    # - il campo free del polo a True se c'è almeno una location libera
-    # - il campo roomAvailableSoon della location a True se la location sarà libera entro 30 minuti
-    # - il campo buildingAvailableSoon del polo a True se c'è almeno una location che sarà libera entro 30 minuti
     now = datetime.now(pisa_timezone)
-    for polo in buildings_status:
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
-                # Rimuovi le lezioni terminate
-                buildings_status[polo][location]['lessons'] = [lesson for lesson in buildings_status[polo][location]['lessons']
-                                                               if datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now]
 
-                if not is_usually_open(polo, location):
-                    buildings_status[polo][location]['free'] = False
-                    buildings_status[polo][location]['roomAvailableSoon'] = False
-                    continue
-                
-                # Imposta inizialmente l'aula come libera
-                buildings_status[polo][location]['free'] = True
-                buildings_status[polo][location]['roomAvailableSoon'] = False
+    for polo, building in buildings_status.items():
+        for location, room in building.rooms.items():
+            room.lessons = [
+                lesson for lesson in room.lessons
+                if datetime.strptime(lesson.end, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) > now
+            ]
 
-                # Se l'aula ha almeno una lezione in corso, non è libera
-                for lesson in buildings_status[polo][location]['lessons']:
-                    start_time = datetime.strptime(lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
-                    end_time = datetime.strptime(lesson['end'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
-                    # Controlla se la lezione è in corso
-                    if start_time <= now <= end_time:
-                        buildings_status[polo][location]['free'] = False
+            if not is_usually_open(polo, location):
+                room.free = False
+                room.roomAvailableSoon = False
+                continue
 
-                        # Verifica se la lezione finisce entro 30 minuti
-                        if end_time - now <= timedelta(minutes=30):
-                            # Controlla se c'è un'altra lezione che inizia esattamente quando termina la lezione corrente
-                            # oppure se inizia 15 minuti dopo la fine della lezione corrente
-                            next_lesson_exists = any(
-                                datetime.strptime(next_lesson['start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone) in {end_time, end_time + timedelta(minutes=15)}
-                                for next_lesson in buildings_status[polo][location]['lessons']
-                                )
+            room.free = True
+            room.roomAvailableSoon = False
 
-                            # Se non c'è un'altra lezione che inizia quando termina l'attuale, setta 'availableSoon' a True
-                            if not next_lesson_exists:
-                                buildings_status[polo][location]['roomAvailableSoon'] = True
-        
+            for lesson in room.lessons:
+                start_time = datetime.strptime(lesson.start, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                end_time = datetime.strptime(lesson.end, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                if start_time <= now <= end_time:
+                    room.free = False
+                    if end_time - now <= timedelta(minutes=30):
+                        next_lesson_exists = any(
+                            datetime.strptime(nl.start, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pisa_timezone)
+                            in {end_time, end_time + timedelta(minutes=15)}
+                            for nl in room.lessons
+                        )
+                        if not next_lesson_exists:
+                            room.roomAvailableSoon = True
 
-        # Se il polo ha almeno una aula liberata, il polo è considerato libero
-        buildings_status[polo]['free'] = False
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free','isClosed']:
-                if buildings_status[polo][location]['free'] == True:
-                    buildings_status[polo]['free'] = True
-                    break
-    
-        # se il polo ha almeno una aula che sarà libera entro 30 minuti, il polo è considerato disponibile a breve
-        buildings_status[polo]['buildingAvailableSoon'] = False
-        for location in buildings_status[polo]:
-            if location not in ['coordinates', 'buildingAvailableSoon', 'free', 'isClosed']:
-                if buildings_status[polo][location]['roomAvailableSoon'] == True:
-                    buildings_status[polo]['buildingAvailableSoon'] = True
-                    break
-    
+        building.free = any(room.free for room in building.rooms.values())
+        building.buildingAvailableSoon = any(room.roomAvailableSoon for room in building.rooms.values())
+
     return buildings_status
 
 

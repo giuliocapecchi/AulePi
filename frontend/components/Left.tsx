@@ -84,16 +84,14 @@ export default function Left({
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent className="divide-y divide-dashed divide-zinc-600">
-                                    {Object.entries(building)
-                                        .filter(([roomNumber, room]) => typeof room !== "boolean" && !Array.isArray(room)) // Filtra solo le stanze
+                                    {Object.entries(building.rooms)
                                         .sort(([, a], [, b]) => {
-                                            // Ordinamento per: free (true) -> roomAvailableSoon (true) -> free (false)
-                                            if (a.free && !b.free) return -1; // a precede b
-                                            if (!a.free && b.free) return 1; // b precede a
-                                            if (a.roomAvailableSoon && !b.roomAvailableSoon) return -1; // a precede b
-                                            if (!a.roomAvailableSoon && b.roomAvailableSoon) return 1; // b precede a
-                                            return 0; // Nessun cambiamento
-                                        }) // Ordina per mettere le stanze libere in cima
+                                            if (a.free && !b.free) return -1;
+                                            if (!a.free && b.free) return 1;
+                                            if (a.roomAvailableSoon && !b.roomAvailableSoon) return -1;
+                                            if (!a.roomAvailableSoon && b.roomAvailableSoon) return 1;
+                                            return 0;
+                                        })
                                         .map(([roomNumber, room]) => (
                                             <div
                                                 key={roomNumber}

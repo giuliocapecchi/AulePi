@@ -36,17 +36,10 @@ def test():
 
 @app.route('/api/open-classrooms', methods=['GET'])
 def get_open_classrooms():
-    
-    print("GET method invoked")    
-
-    update_calendars() # la funzione controlla se i calendari sono già stati aggiornati per la data odierna. Se non lo sono esegue l'aggiornamento
+    print("GET method invoked")
+    update_calendars()
     buildings_status = unipi_calendar.get_buildings_status()
-    response = jsonify(buildings_status)
-    
-    # payload_size = len(response.get_data()) / (1024) 
-    # print("Dim. della risposta:", payload_size)
-    
-    return response
+    return jsonify({polo: building.model_dump() for polo, building in buildings_status.items()})
 
 
 if __name__ == '__main__':
