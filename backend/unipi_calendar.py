@@ -88,7 +88,7 @@ def list_all_blobs():
 def upload_a_blob(file_name, file_content):
     try:
         file_content_bytes = file_content.encode('utf-8')
-        resp = vercel_blob.put(file_name, file_content_bytes, {"addRandomSuffix": "false"})
+        resp = vercel_blob.put(file_name, file_content_bytes, {"addRandomSuffix": "false", "allowOverwrite": "true"})
         print("Vercel response : ", resp, "\n")
     except Exception as e:
         print(f"Blob upload skipped ({file_name}): {e}")
