@@ -18,8 +18,6 @@ const loadMapboxGL = async () => {
     return mapboxgl;
 };
 
-// Kick off Mapbox GL loading as early as possible — runs when this module is first imported,
-// in parallel with the data fetch, so the library is ready when the map mounts.
 if (typeof window !== 'undefined') {
     loadMapboxGL();
 }
@@ -33,8 +31,10 @@ export default function Map({
     handleMarkerClick: (building: string) => void;
     userPos: [number, number] | null;
 }) {
-    const mapRef = useRef<mapboxgl.Map | null>(null);
+    const mapRef = useRef<any>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
+    const markersRef = useRef<any[]>([]);
+    const userMarkerRef = useRef<any>(null);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
@@ -57,6 +57,7 @@ export default function Map({
         );
     };
 
+    // Effect 1: initialize the map once
     useEffect(() => {
         const initializeMap = async () => {
             try {
@@ -71,7 +72,6 @@ export default function Map({
 
                 if (!mapContainerRef.current) return;
 
-                // Compute initial center/zoom here so window is always available
                 const isMobile = window.innerWidth < 768;
                 const center: [number, number] = userPos && isUserInPisa(userPos)
                     ? [userPos[1], userPos[0]]
@@ -91,51 +91,7 @@ export default function Map({
                     [10.3789, 43.7067],
                     [10.4185, 43.7257]
                 );
-                mapRef.current?.setMaxBounds(bounds);
-
-                if (typeof data === 'object' && data !== null) {
-                    Object.entries(data).forEach(([buildingCode, building]) => {
-                        const el = document.createElement("div");
-                        el.className = "relative";
-
-                        const markerCircle = document.createElement("div");
-                        markerCircle.className = getColorByStatus(building.free as boolean, building.isClosed as boolean, building.buildingAvailableSoon as boolean);
-                        el.appendChild(markerCircle);
-
-                        const label = document.createElement("div");
-                        label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded";
-                        label.innerText = buildingCode.replace("polo", "Polo ");
-                        el.appendChild(label);
-
-                        el.addEventListener("click", () => {
-                            if (!building.isClosed) {
-                                const accordionItem = document.getElementById(buildingCode);
-                                setTimeout(() => {
-                                    if (accordionItem) {
-                                        accordionItem.scrollIntoView({ behavior: "smooth", block: "start" });
-                                    }
-                                }, 300);
-                                handleMarkerClick(buildingCode);
-                            }
-                        });
-
-                        if (mapRef.current && building.coordinates) {
-                            new mapboxModule.Marker(el)
-                                .setLngLat(building.coordinates as [number, number])
-                                .addTo(mapRef.current);
-                        }
-                    });
-                } else {
-                    console.error("Data is not an object:", data);
-                }
-
-                if (userPos && mapRef.current) {
-                    const e2 = document.createElement("div");
-                    e2.className = "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
-                    new mapboxModule.Marker(e2)
-                        .setLngLat([userPos[1], userPos[0]])
-                        .addTo(mapRef.current);
-                }
+                mapRef.current.setMaxBounds(bounds);
             } catch (error) {
                 console.error("Errore durante il caricamento della mappa:", error);
             }
@@ -146,9 +102,89 @@ export default function Map({
         return () => {
             if (mapRef.current) {
                 mapRef.current.remove();
+                mapRef.current = null;
             }
         };
     }, [mapboxToken]);
+
+    // Effect 2: add/update building markers whenever data changes
+    useEffect(() => {
+        if (!mapRef.current || Object.keys(data).length === 0) return;
+
+        const mapboxModule = mapboxgl;
+        if (!mapboxModule) return;
+
+        const addMarkers = () => {
+            // Remove old markers
+            markersRef.current.forEach(m => m.remove());
+            markersRef.current = [];
+
+            Object.entries(data).forEach(([buildingCode, building]) => {
+                const el = document.createElement("div");
+                el.className = "relative";
+
+                const markerCircle = document.createElement("div");
+                markerCircle.className = getColorByStatus(building.free, building.isClosed, building.buildingAvailableSoon);
+                el.appendChild(markerCircle);
+
+                const label = document.createElement("div");
+                label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded";
+                label.innerText = buildingCode.replace("polo", "Polo ");
+                el.appendChild(label);
+
+                el.addEventListener("click", () => {
+                    if (!building.isClosed) {
+                        const accordionItem = document.getElementById(buildingCode);
+                        setTimeout(() => {
+                            if (accordionItem) {
+                                accordionItem.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                        }, 300);
+                        handleMarkerClick(buildingCode);
+                    }
+                });
+
+                if (building.coordinates) {
+                    const marker = new mapboxModule.Marker(el)
+                        .setLngLat(building.coordinates as [number, number])
+                        .addTo(mapRef.current);
+                    markersRef.current.push(marker);
+                }
+            });
+        };
+
+        // Wait for the map style to be loaded before adding markers
+        if (mapRef.current.isStyleLoaded()) {
+            addMarkers();
+        } else {
+            mapRef.current.once('style.load', addMarkers);
+        }
+    }, [data, handleMarkerClick]);
+
+    // Effect 3: add user position marker
+    useEffect(() => {
+        if (!mapRef.current || !userPos) return;
+
+        const mapboxModule = mapboxgl;
+        if (!mapboxModule) return;
+
+        const addUserMarker = () => {
+            if (userMarkerRef.current) {
+                userMarkerRef.current.remove();
+            }
+            const e2 = document.createElement("div");
+            e2.className = "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
+            userMarkerRef.current = new mapboxModule.Marker(e2)
+                .setLngLat([userPos[1], userPos[0]])
+                .addTo(mapRef.current);
+        };
+
+        if (mapRef.current.isStyleLoaded()) {
+            addUserMarker();
+        } else {
+            mapRef.current.once('style.load', addUserMarker);
+        }
+    }, [userPos]);
 
     return (
         <div className="h-[60vh] sm:w-full sm:h-full relative bg-red-500/0 rounded-[20px] p-2 sm:p-0">
