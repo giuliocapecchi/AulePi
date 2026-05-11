@@ -257,6 +257,8 @@ def parse_aule_csv(content):
     """
     global buildings_status, poli_coordinates, usually_open_dict
 
+    _BUILDING_FIELDS = {'buildingAvailableSoon', 'isClosed', 'free', 'coordinates', 'rooms'}
+
     f = io.StringIO(content)
     reader = csv.reader(f)
     next(reader)
@@ -264,6 +266,9 @@ def parse_aule_csv(content):
         polo = row[0]
         location = row[1]
         usually_open = row[2] == "True"
+
+        if location in _BUILDING_FIELDS:
+            continue
 
         if polo not in usually_open_dict:
             usually_open_dict[polo] = {}
