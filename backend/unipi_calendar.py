@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo  # Python 3.9+
 import io
 import requests
 import csv
-import vercel_blob
+from vercel.blob import sync as blob
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
@@ -78,53 +78,29 @@ poli_coordinates = {
 
 # ----------------------------- VercelFS utility functions ------------------------------------------------- #
 
-def list_all_blobs():
-    blobs = vercel_blob.list({
-        'limit': '5',
-    })
-    return blobs
-
-
 def upload_a_blob(file_name, file_content):
     try:
-        file_content_bytes = file_content.encode('utf-8')
-        resp = vercel_blob.put(file_name, file_content_bytes, {"addRandomSuffix": "false", "allowOverwrite": "true"})
-        print("Vercel response : ", resp, "\n")
+        result = blob.put_blob(
+            file_name, file_content.encode("utf-8"), access="public", allow_overwrite=True
+        )
+        print(f"Blob uploaded: {result.pathname}")
     except Exception as e:
         print(f"Blob upload skipped ({file_name}): {e}")
 
 
 def download_file_from_vercelFS(filename):
     try:
-        blobs = vercel_blob.list({'prefix': filename, 'limit': '1'})
+        result = blob.get_blob(filename, access="public")
+        return result.body.decode("utf-8") or None
+    except blob.BlobNotFoundError:
+        print(f"File {filename} non trovato su VercelFS.")
     except Exception as e:
         print(f"Blob unavailable, skipping {filename}: {e}")
-        return None
-    for blob in blobs['blobs']:
-        if blob['pathname'] == filename:
-            response = requests.get(blob['url'])
-            if response.status_code == 200:
-                content = response.content.decode('utf-8')
-                print(f"{filename} caricato in memoria con successo.")
-                if content:
-                    return content
-            else:
-                print(f"Errore nel download di {filename}: {response.status_code}")
-                return None
-    print(f"File {filename} non trovato su VercelFS.")
     return None
 
 
 def delete_blob_by_filename(filename):
-    # Trova l'URL del blob utilizzando il nome del file
-    blobs = list_all_blobs()
-    for blob in blobs['blobs']:
-        if blob['pathname'] == filename:
-            # Elimina il blob se trovato
-            resp = vercel_blob.delete(blob['url'])
-            print(f"Eliminato {filename}: {resp}")
-    else:
-        print(f"File {filename} non trovato.")
+    blob.delete_blob(filename)
 
 
 # ----------------------------- functions to interact with the university of Pisa APIs ------------------------------------------------- #
@@ -511,7 +487,7 @@ def buildings_to_csv():
     f.seek(0)
     print("Uplaod del nuovo 'aule.csv' su VercelFS.")
     aule_csv_content = f.getvalue()
-    # La upload_a_blob fa overwrite del file se esiste già su VercelFS -> https://pypi.org/project/vercel_blob/
+    # Sovrascrive aule.csv se è già presente su Vercel Blob.
     # quindi non serve la delete del file
     upload_a_blob("aule.csv", aule_csv_content)
     f.close()

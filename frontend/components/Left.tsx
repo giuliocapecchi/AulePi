@@ -234,7 +234,7 @@ function formatTime(timeString: string) {
 }
 
 // Funzione per ottenere la label colorata per un building, a seconda dello stato e dell'ora
-function getAvailabilityDiv(building: BuildingData): JSX.Element {
+function getAvailabilityDiv(building: BuildingData): React.JSX.Element {
     if (building.free && !building.isClosed) { // Se l'edificio è disponibile
         return (
             <div className="bg-green-800/20 text-green-300/90 rounded-lg px-2 py-1 text-sm">

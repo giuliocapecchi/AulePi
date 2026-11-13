@@ -7,7 +7,7 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv>=1.0.1",
     "requests>=2.32.3",
-    "vercel-blob>=0.3.0",
+    "vercel-blob>=0.6,<0.7",
 ]
 
 [tool.uv]
