@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 from zoneinfo import ZoneInfo # Python 3.9
 import math
+from threading import Lock
 import unipi_calendar
 
 
@@ -9,6 +10,7 @@ app = Flask(__name__)
 
 
 calendari = {} # chiavi : 'date' , 'lessons'
+calendar_lock = Lock()
 pisa_timezone = ZoneInfo("Europe/Rome")
 
 
@@ -16,12 +18,13 @@ def update_calendars():
     today = datetime.now(pisa_timezone).date()
     today = today.strftime("%Y-%m-%d")
 
-    if calendari == {} or calendari['date'] != today:
-        print("Calendari non presenti o non aggiornati")
-        # scarico i calendari e li aggiungo al dizionario globale
-        calendari['date'] = today
-        calendari['lessons'] = unipi_calendar.load_calendars_and_parse()
-    
+    # Share cold initialization between concurrent requests and publish the
+    # cache date only after a successful refresh, so failures can be retried.
+    with calendar_lock:
+        if not calendari or calendari['date'] != today:
+            lessons = unipi_calendar.load_calendars_and_parse()
+            calendari.update(date=today, lessons=lessons)
+
 
 @app.get('/')
 def hello_world():

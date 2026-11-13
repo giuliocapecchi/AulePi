@@ -1,190 +1,96 @@
 "use client";
-import React, { useRef, useEffect } from "react";
+import React, { memo, useRef, useEffect, useState } from "react";
+import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { BuildingData } from "@/types/interfaces";
 
-let mapboxgl: any = null;
+let mapboxPromise: Promise<typeof import("mapbox-gl")["default"]> | undefined;
 
-const loadMapboxGL = async () => {
-    if (!mapboxgl) {
-        const mapboxModule = await import('mapbox-gl');
-        mapboxgl = mapboxModule.default;
-        if (typeof document !== 'undefined') {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css';
-            document.head.appendChild(link);
-        }
+const loadMapboxGL = () => {
+    if (!mapboxPromise) {
+        mapboxPromise = import("mapbox-gl").then((module) => module.default).catch((error) => {
+            mapboxPromise = undefined;
+            throw error;
+        });
     }
-    return mapboxgl;
+    return mapboxPromise;
 };
 
-if (typeof window !== 'undefined') {
-    loadMapboxGL();
+function getColorByStatus(building: BuildingData) {
+    if (building.free && !building.isClosed) return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
+    if (building.buildingAvailableSoon && !building.isClosed) return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px rgba(255,165,0,0.7)]";
+    return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px rgba(239,68,68,0.9)]";
 }
 
-export default function Map({
-    data,
-    handleMarkerClick,
-    userPos,
-}: {
+function Map({ data, handleMarkerClick, userPos }: {
     data: { [key: string]: BuildingData };
     handleMarkerClick: (building: string) => void;
     userPos: [number, number] | null;
 }) {
-    const mapRef = useRef<any>(null);
     const mapContainerRef = useRef<HTMLDivElement | null>(null);
-    const markersRef = useRef<any[]>([]);
-    const userMarkerRef = useRef<any>(null);
-
+    const initialUserPos = useRef(userPos);
+    const [map, setMap] = useState<MapboxMap | null>(null);
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
-    function getColorByStatus(free: boolean, isClosed: boolean, buildingAvailableSoon: boolean) {
-        if (free && !isClosed) {
-            return "h-3 w-3 rounded-full bg-green-400 shadow-[0px_0px_4px_2px_rgba(34,197,94,0.7)]";
-        } else if (buildingAvailableSoon && !isClosed) {
-            return "h-3 w-3 rounded-full bg-orange-500 shadow-[0px_0px_4px_2px rgba(255,165,0,0.7)]";
-        } else {
-            return "h-3 w-3 rounded-full bg-red-400 shadow-[0px_0px_4px_2px rgba(239,68,68,0.9)]";
-        }
-    }
-
-    const isUserInPisa = (position: [number, number]): boolean => {
-        const [latitude, longitude] = position;
-        const pisaBounds = { north: 43.7366, south: 43.7072, east: 10.4271, west: 10.3643 };
-        return (
-            latitude >= pisaBounds.south && latitude <= pisaBounds.north &&
-            longitude >= pisaBounds.west && longitude <= pisaBounds.east
-        );
-    };
-
-    // Effect 1: initialize the map once
     useEffect(() => {
-        const initializeMap = async () => {
-            try {
-                const mapboxModule = await loadMapboxGL();
-
-                if (mapboxToken) {
-                    mapboxModule.accessToken = mapboxToken;
-                } else {
-                    console.error("Mapbox token is not defined");
-                    return;
-                }
-
-                if (!mapContainerRef.current) return;
-
-                const isMobile = window.innerWidth < 768;
-                const center: [number, number] = userPos && isUserInPisa(userPos)
-                    ? [userPos[1], userPos[0]]
-                    : isMobile
-                        ? [10.391578, 43.718735]
-                        : [10.395310, 43.716592];
-
-                mapRef.current = new mapboxModule.Map({
-                    style: "mapbox://styles/giuliocape/cm2n7u82b003701piec8z517h",
-                    container: mapContainerRef.current,
-                    center,
-                    zoom: 16,
-                    pitch: 69.97,
-                });
-
-                const bounds = new mapboxModule.LngLatBounds(
-                    [10.3789, 43.7067],
-                    [10.4185, 43.7257]
-                );
-                mapRef.current.setMaxBounds(bounds);
-            } catch (error) {
-                console.error("Errore durante il caricamento della mappa:", error);
-            }
-        };
-
-        initializeMap();
-
-        return () => {
-            if (mapRef.current) {
-                mapRef.current.remove();
-                mapRef.current = null;
-            }
-        };
+        if (!mapboxToken) { console.error("Mapbox token is not defined"); return; }
+        let disposed = false;
+        let instance: MapboxMap | undefined;
+        void loadMapboxGL().then((mapboxModule) => {
+            if (disposed || !mapContainerRef.current) return;
+            const position = initialUserPos.current;
+            const inPisa = position && position[0] >= 43.7072 && position[0] <= 43.7366 && position[1] >= 10.3643 && position[1] <= 10.4271;
+            mapboxModule.accessToken = mapboxToken;
+            instance = new mapboxModule.Map({
+                style: "mapbox://styles/giuliocape/cm2n7u82b003701piec8z517h",
+                container: mapContainerRef.current,
+                center: inPisa ? [position[1], position[0]] : window.innerWidth < 768 ? [10.391578, 43.718735] : [10.395310, 43.716592],
+                zoom: 16,
+                pitch: 69.97,
+                maxBounds: [[10.3789, 43.7067], [10.4185, 43.7257]],
+            });
+            setMap(instance);
+        }).catch((error) => { if (!disposed) console.error("Errore durante il caricamento della mappa:", error); });
+        return () => { disposed = true; instance?.remove(); };
     }, [mapboxToken]);
 
-    // Effect 2: add/update building markers whenever data changes
+    // Markers depend on both resources, regardless of whether the data or the
+    // asynchronous map import finishes first. No style.load listeners accumulate.
     useEffect(() => {
-        if (!mapRef.current || Object.keys(data).length === 0) return;
-
-        const mapboxModule = mapboxgl;
-        if (!mapboxModule) return;
-
-        const addMarkers = () => {
-            // Remove old markers
-            markersRef.current.forEach(m => m.remove());
-            markersRef.current = [];
-
-            Object.entries(data).forEach(([buildingCode, building]) => {
-                const el = document.createElement("div");
-                el.className = "relative";
-
-                const markerCircle = document.createElement("div");
-                markerCircle.className = getColorByStatus(building.free, building.isClosed, building.buildingAvailableSoon);
-                el.appendChild(markerCircle);
-
+        if (!map) return;
+        let disposed = false;
+        const markers: MapboxMarker[] = [];
+        void loadMapboxGL().then((mapboxModule) => {
+            if (disposed) return;
+            for (const [buildingCode, building] of Object.entries(data)) {
+                if (!building.coordinates) continue;
+                const element = document.createElement("div");
+                element.className = "relative";
+                const circle = document.createElement("div");
+                circle.className = getColorByStatus(building);
                 const label = document.createElement("div");
                 label.className = "absolute bottom-full mb-2 text-black text-sm bg-white/50 min-w-[60px] text-center p-1 rounded";
                 label.innerText = buildingCode.replace("polo", "Polo ");
-                el.appendChild(label);
-
-                el.addEventListener("click", () => {
-                    if (!building.isClosed) {
-                        const accordionItem = document.getElementById(buildingCode);
-                        setTimeout(() => {
-                            if (accordionItem) {
-                                accordionItem.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                        }, 300);
-                        handleMarkerClick(buildingCode);
-                    }
-                });
-
-                if (building.coordinates) {
-                    const marker = new mapboxModule.Marker(el)
-                        .setLngLat(building.coordinates as [number, number])
-                        .addTo(mapRef.current);
-                    markersRef.current.push(marker);
-                }
-            });
-        };
-
-        // Wait for the map style to be loaded before adding markers
-        if (mapRef.current.isStyleLoaded()) {
-            addMarkers();
-        } else {
-            mapRef.current.once('style.load', addMarkers);
-        }
-    }, [data, handleMarkerClick]);
-
-    // Effect 3: add user position marker
-    useEffect(() => {
-        if (!mapRef.current || !userPos) return;
-
-        const mapboxModule = mapboxgl;
-        if (!mapboxModule) return;
-
-        const addUserMarker = () => {
-            if (userMarkerRef.current) {
-                userMarkerRef.current.remove();
+                element.append(circle, label);
+                element.addEventListener("click", () => { if (!building.isClosed) handleMarkerClick(buildingCode); });
+                markers.push(new mapboxModule.Marker(element).setLngLat(building.coordinates).addTo(map));
             }
-            const e2 = document.createElement("div");
-            e2.className = "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
-            userMarkerRef.current = new mapboxModule.Marker(e2)
-                .setLngLat([userPos[1], userPos[0]])
-                .addTo(mapRef.current);
-        };
+        }).catch((error) => { if (!disposed) console.error("Failed to add map markers:", error); });
+        return () => { disposed = true; markers.forEach((marker) => marker.remove()); };
+    }, [map, data, handleMarkerClick]);
 
-        if (mapRef.current.isStyleLoaded()) {
-            addUserMarker();
-        } else {
-            mapRef.current.once('style.load', addUserMarker);
-        }
-    }, [userPos]);
+    useEffect(() => {
+        if (!map || !userPos) return;
+        let disposed = false;
+        let marker: MapboxMarker | undefined;
+        void loadMapboxGL().then((mapboxModule) => {
+            if (disposed) return;
+            const element = document.createElement("div");
+            element.className = "h-3 w-3 border-[1.5px] border-zinc-50 rounded-full bg-blue-400 shadow-[0px_0px_4px_2px rgba(14,165,233,1)]";
+            marker = new mapboxModule.Marker(element).setLngLat([userPos[1], userPos[0]]).addTo(map);
+        }).catch((error) => { if (!disposed) console.error("Failed to position user:", error); });
+        return () => { disposed = true; marker?.remove(); };
+    }, [map, userPos]);
 
     return (
         <div className="h-[60vh] sm:w-full sm:h-full relative bg-red-500/0 rounded-[20px] p-2 sm:p-0">
@@ -216,3 +122,5 @@ export default function Map({
         </div>
     );
 }
+
+export default memo(Map);
